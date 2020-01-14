@@ -100,10 +100,13 @@ static void got_connection_managers (GObject *source,
     g_main_loop_quit (mainloop);
 }
 
+// check:
+// https://git.sailfishos.org/mer-core/voicecall/tree/master/plugins/providers/telepathy
+// https://git.sailfishos.org/mer-core/voicecall/blob/master/plugins/providers/telepathy/src/telepathyproviderplugin.cpp#L106
 
 int main(int argc, char *argv[])
 {
-    char phone_nr[MAX_PHONE_SIZE];
+    char msisdn[MAX_PHONE_SIZE];
     int mode = MODE_NONE;
 
     if (argc < 2){
@@ -122,7 +125,7 @@ int main(int argc, char *argv[])
     while ((opt = getopt(argc, argv, "d:ah")) != -1){
         switch (opt){
         case 'd':
-            strncpy (phone_nr, optarg, MAX_PHONE_SIZE);
+            strncpy (msisdn, optarg, MAX_PHONE_SIZE);
             mode = MODE_DIAL;
             break;
         case 'a':
