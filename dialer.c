@@ -16,6 +16,8 @@
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  *
+ * Rhizo-dialer is an experimental dialer for Maemo.
+ *
  */
 
 #include <unistd.h>
@@ -34,6 +36,7 @@
 #include <telepathy-glib/telepathy-glib.h>
 #include <telepathy-glib/telepathy-glib-dbus.h>
 
+// ms
 #define MAX_PHONE_SIZE 512
 
 #define MODE_NONE 0
@@ -221,6 +224,8 @@ int main(int argc, char *argv[])
     window = HILDON_WINDOW(hildon_window_new());
     hildon_program_add_window(program, window);
 
+    // TODO: Use Hildon widgets!
+    // http://maemo.org/api_refs/5.0/5.0-final/hildon/
     /* Create buttons and add it to main view */
     GtkWidget *vbox = gtk_vbox_new(TRUE, 5);
     GtkWidget *hbox1 = gtk_hbox_new(TRUE, 5);
