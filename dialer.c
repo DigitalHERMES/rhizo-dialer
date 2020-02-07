@@ -27,17 +27,11 @@
 #include <string.h>
 #include <getopt.h>
 
-// Hildon stuff
-#include <hildon/hildon-banner.h>
-#include <hildon/hildon-program.h>
-#include <gtk/gtk.h>
-
-// Telepathy stuff
 #include <telepathy-glib/telepathy-glib.h>
 #include <telepathy-glib/telepathy-glib-dbus.h>
 
-// ms
-#define MAX_PHONE_SIZE 512
+#include "ui.h"
+#include "tp.h"
 
 #define MODE_NONE 0
 #define MODE_DIAL 1
@@ -45,74 +39,6 @@
 #define MODE_HANGUP 3
 #define MODE_DIAL_PAD 4
 
-static void got_connections (const gchar * const *bus_names,
-                 gsize n,
-                 const gchar * const *cms,
-                 const gchar * const *protocols,
-                 const GError *error,
-                 gpointer user_data,
-                 GObject *unused)
-{
-    GMainLoop *mainloop = user_data;
-
-    if (error != NULL)
-    {
-        g_warning ("%s", error->message);
-    }
-    else
-    {
-        gsize i;
-
-        g_message ("Found %" G_GSIZE_FORMAT " connections:", n);
-
-        for (i = 0; i < n; i++)
-        {
-            g_message ("%s", bus_names[i]);
-            g_message ("- CM %s, protocol %s", cms[i], protocols[i]);
-        }
-
-        /* all the arrays are also NULL-terminated */
-        g_assert (bus_names[n] == NULL && cms[n] == NULL &&
-                  protocols[n] == NULL);
-    }
-
-    g_main_loop_quit (mainloop);
-}
-
-static void got_connection_managers (GObject *source,
-    GAsyncResult *result,
-    gpointer user_data)
-{
-    GMainLoop *mainloop = user_data;
-    GList *cms;
-    GError *error = NULL;
-
-    cms = tp_list_connection_managers_finish (result, &error);
-    if (error != NULL)
-    {
-        g_warning ("%s", error->message);
-        g_clear_error (&error);
-    }
-    else
-    {
-        g_message ("Found %u connection managers:", g_list_length (cms));
-
-        while (cms != NULL)
-        {
-            TpConnectionManager *cm = cms->data;
-
-            g_message ("- %s", tp_connection_manager_get_name (cm));
-
-            g_object_unref (cm);
-            cms = g_list_delete_link (cms, cms);
-        }
-    }
-
-    g_main_loop_quit (mainloop);
-}
-
-GtkWidget *display;
-char dial_pad[MAX_PHONE_SIZE];
 
 void callback_button_pressed(GtkWidget * widget, char key_pressed)
 {
@@ -170,9 +96,6 @@ TP_DTMF_EVENT_ASTERISK
 
 int main(int argc, char *argv[])
 {
-    /* Hildon/GTK stuff */
-    HildonProgram *program;
-    HildonWindow *window;
 
     char msisdn[MAX_PHONE_SIZE];
     int mode = MODE_NONE;
@@ -227,31 +150,31 @@ int main(int argc, char *argv[])
     // TODO: Use Hildon widgets!
     // http://maemo.org/api_refs/5.0/5.0-final/hildon/
     /* Create buttons and add it to main view */
-    GtkWidget *vbox = gtk_vbox_new(TRUE, 5);
-    GtkWidget *hbox1 = gtk_hbox_new(TRUE, 5);
-    GtkWidget *hbox2 = gtk_hbox_new(TRUE, 5);
-    GtkWidget *hbox3 = gtk_hbox_new(TRUE, 5);
-    GtkWidget *hbox4 = gtk_hbox_new(TRUE, 5);
-    GtkWidget *hbox5 = gtk_hbox_new(TRUE, 5);
+    vbox = gtk_vbox_new(TRUE, 5);
+    hbox1 = gtk_hbox_new(TRUE, 5);
+    hbox2 = gtk_hbox_new(TRUE, 5);
+    hbox3 = gtk_hbox_new(TRUE, 5);
+    hbox4 = gtk_hbox_new(TRUE, 5);
+    hbox5 = gtk_hbox_new(TRUE, 5);
 
     display = gtk_entry_new();
     gtk_entry_set_alignment (GTK_ENTRY(display), 0.5);
     gtk_editable_set_editable (GTK_EDITABLE (display), FALSE);
 
-    GtkWidget *button9 = gtk_button_new_with_label("9");
-    GtkWidget *button8 = gtk_button_new_with_label("8");
-    GtkWidget *button7 = gtk_button_new_with_label("7");
-    GtkWidget *button6 = gtk_button_new_with_label("6");
-    GtkWidget *button5 = gtk_button_new_with_label("5");
-    GtkWidget *button4 = gtk_button_new_with_label("4");
-    GtkWidget *button3 = gtk_button_new_with_label("3");
-    GtkWidget *button2 = gtk_button_new_with_label("2");
-    GtkWidget *button1 = gtk_button_new_with_label("1");
-    GtkWidget *button0 = gtk_button_new_with_label("0");
-    GtkWidget *buttonStar = gtk_button_new_with_label("*");
-    GtkWidget *buttonHash = gtk_button_new_with_label("#");
-    GtkWidget *buttonDial = gtk_button_new_with_label("Call");
-    GtkWidget *buttonHangup = gtk_button_new_with_label("Hangup");
+    button9 = gtk_button_new_with_label("9");
+    button8 = gtk_button_new_with_label("8");
+    button7 = gtk_button_new_with_label("7");
+    button6 = gtk_button_new_with_label("6");
+    button5 = gtk_button_new_with_label("5");
+    button4 = gtk_button_new_with_label("4");
+    button3 = gtk_button_new_with_label("3");
+    button2 = gtk_button_new_with_label("2");
+    button1 = gtk_button_new_with_label("1");
+    button0 = gtk_button_new_with_label("0");
+    buttonStar = gtk_button_new_with_label("*");
+    buttonHash = gtk_button_new_with_label("#");
+    buttonDial = gtk_button_new_with_label("Call");
+    buttonHangup = gtk_button_new_with_label("Hangup");
 
     g_signal_connect(G_OBJECT(button9), "clicked", G_CALLBACK(callback_button_pressed), (void *) '9');
     g_signal_connect(G_OBJECT(button8), "clicked", G_CALLBACK(callback_button_pressed), (void *) '8');
