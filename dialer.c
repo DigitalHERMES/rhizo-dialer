@@ -130,6 +130,27 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 
     gtk_entry_set_text (GTK_ENTRY(display), dial_pad);
 
+#if 0
+// play correct DTMF event
+    switch(key_pressed)
+    {
+    case '1':
+        TP_DTMF_EVENT_DIGIT_1;
+        break;
+        ...
+TP_DTMF_EVENT_DIGIT_2
+TP_DTMF_EVENT_DIGIT_3
+TP_DTMF_EVENT_DIGIT_4
+TP_DTMF_EVENT_DIGIT_5
+TP_DTMF_EVENT_DIGIT_6
+TP_DTMF_EVENT_DIGIT_7
+TP_DTMF_EVENT_DIGIT_8
+TP_DTMF_EVENT_DIGIT_9
+TP_DTMF_EVENT_HASH
+TP_DTMF_EVENT_DIGIT_0
+TP_DTMF_EVENT_ASTERISK
+#endif
+
     /* Show the dialog */
     //gtk_widget_show_all(GTK_WIDGET(dialog));
     /* Wait for user to select OK or CANCEL */
@@ -210,6 +231,7 @@ int main(int argc, char *argv[])
 
     display = gtk_entry_new();
     gtk_entry_set_alignment (GTK_ENTRY(display), 0.5);
+    gtk_editable_set_editable (GTK_EDITABLE (display), FALSE);
 
     GtkWidget *button9 = gtk_button_new_with_label("9");
     GtkWidget *button8 = gtk_button_new_with_label("8");
@@ -276,6 +298,7 @@ int main(int argc, char *argv[])
     GMainLoop *mainloop = g_main_loop_new (NULL, FALSE);
     int exit_code = EXIT_SUCCESS;
     TpDBusDaemon *bus_daemon;
+    TpDTMFEvent DTMFevent;
     GError *error = NULL;
 
     bus_daemon = tp_dbus_daemon_dup (&error);
