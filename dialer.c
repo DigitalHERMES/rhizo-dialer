@@ -93,7 +93,7 @@ TP_DTMF_EVENT_ASTERISK
 // check:
 // https://git.sailfishos.org/mer-core/voicecall/tree/master/plugins/providers/telepathy
 // https://git.sailfishos.org/mer-core/voicecall/blob/master/plugins/providers/telepathy/src/telepathyproviderplugin.cpp#L106
-
+// /usr/share/ofono/scripts/enable-modem /usr/share/ofono/scripts/online-modem
 int main(int argc, char *argv[])
 {
 
@@ -147,6 +147,8 @@ int main(int argc, char *argv[])
     window = HILDON_WINDOW(hildon_window_new());
     hildon_program_add_window(program, window);
 
+    hildon_gtk_window_set_portrait_flags(GTK_WINDOW(window), HILDON_PORTRAIT_MODE_SUPPORT);
+
     // TODO: Use Hildon widgets!
     // http://maemo.org/api_refs/5.0/5.0-final/hildon/
     /* Create buttons and add it to main view */
@@ -162,6 +164,7 @@ int main(int argc, char *argv[])
     gtk_editable_set_editable (GTK_EDITABLE (display), FALSE);
 
     button9 = gtk_button_new_with_label("9");
+//    button9 = hildon_gtk_button_new(HILDON_SIZE_AUTO);
     button8 = gtk_button_new_with_label("8");
     button7 = gtk_button_new_with_label("7");
     button6 = gtk_button_new_with_label("6");
