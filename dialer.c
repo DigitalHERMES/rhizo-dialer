@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
     window = HILDON_WINDOW(hildon_window_new());
     hildon_program_add_window(program, window);
 
-    hildon_gtk_window_set_portrait_flags(GTK_WINDOW(window), HILDON_PORTRAIT_MODE_SUPPORT);
+    hildon_gtk_window_set_portrait_flags(GTK_WINDOW(window), HILDON_PORTRAIT_MODE_SUPPORT); // or HILDON_PORTRAIT_MODE_REQUEST  ?
 
     // TODO: Use Hildon widgets!
     // http://maemo.org/api_refs/5.0/5.0-final/hildon/
@@ -165,6 +165,8 @@ int main(int argc, char *argv[])
 
     button9 = gtk_button_new_with_label("9");
 //    button9 = hildon_gtk_button_new(HILDON_SIZE_AUTO);
+// hildon_gtk_button_new (HILDON_SIZE_FINGER_HEIGHT | HILDON_SIZE_AUTO_WIDTH);
+// gtk_button_set_label (GTK_BUTTON (button9), "9"); // ?
     button8 = gtk_button_new_with_label("8");
     button7 = gtk_button_new_with_label("7");
     button6 = gtk_button_new_with_label("6");
@@ -217,12 +219,15 @@ int main(int argc, char *argv[])
     gtk_container_add(GTK_CONTAINER(vbox), hbox4);
     gtk_container_add(GTK_CONTAINER(vbox), hbox5);
 
-    /* Add VBox to AppView */
+    /* Add VBox to Window */
     gtk_container_add(GTK_CONTAINER(window), vbox);
 
     /* Connect signal to X in the upper corner */
     g_signal_connect(G_OBJECT(window), "delete_event",
       G_CALLBACK(gtk_main_quit), NULL);
+
+    // Lets dial?
+    //https://megous.com/dl/tmp/modem.txt
 
     // nothing works yet, just playing with telepathy...
 
