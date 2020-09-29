@@ -1,7 +1,7 @@
 /*
- * Tablet call app
+ * Voice call audio setup tool
  *
- * Copyright (C) 2019  Ondřej Jirman <megous@megous.com>
+ * Copyright (C) 2020  Ondřej Jirman <megous@megous.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,21 +23,17 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdint.h>
-#include <limits.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
 #include <inttypes.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/time.h>
-#include <math.h>
 
 #include <sound/asound.h>
 #include <sound/tlv.h>
+
+#define ARRAY_SIZE(a) (sizeof((a)) / sizeof((a)[0]))
 
 void syscall_error(int is_err, const char* fmt, ...)
 {
@@ -74,6 +70,7 @@ struct audio_control_state {
 		int64_t i[4];
 		const char* e[4];
 	} vals;
+	bool used;
 };
 
 static bool audio_restore_state(struct audio_control_state* controls, int n_controls)
@@ -123,8 +120,12 @@ static bool audio_restore_state(struct audio_control_state* controls, int n_cont
 				}
 			}
 
-			if (!cs)
+			if (!cs) {
+				printf("Control \"%s\" si not defined in the controls state\n", ids[i].name);
 				continue;
+			}
+
+			cs->used = 1;
 
 			// check if value needs changing
 
@@ -134,7 +135,7 @@ static bool audio_restore_state(struct audio_control_state* controls, int n_cont
 				for (int j = 0; j < inf.count; j++) {
 					if (cs->vals.i[j] != val.value.integer.value[j]) {
 						// update
-						printf("%s <=[%d]= %"PRIi64"\n", ids[i].name, j, cs->vals.i[j]);
+						//printf("%s <=[%d]= %"PRIi64"\n", ids[i].name, j, cs->vals.i[j]);
 
 						val.value.integer.value[j] = cs->vals.i[j];
 						ret = ioctl(fd, SNDRV_CTL_IOCTL_ELEM_WRITE, &val);
@@ -147,7 +148,7 @@ static bool audio_restore_state(struct audio_control_state* controls, int n_cont
 				for (int j = 0; j < inf.count; j++) {
 					if (cs->vals.i[j] != val.value.integer64.value[j]) {
 						// update
-						printf("%s <=[%d]= %"PRIi64"\n", ids[i].name, j, cs->vals.i[j]);
+						//printf("%s <=[%d]= %"PRIi64"\n", ids[i].name, j, cs->vals.i[j]);
 
 						val.value.integer64.value[j] = cs->vals.i[j];
 						ret = ioctl(fd, SNDRV_CTL_IOCTL_ELEM_WRITE, &val);
@@ -177,7 +178,7 @@ static bool audio_restore_state(struct audio_control_state* controls, int n_cont
 
 					if (eval != val.value.enumerated.item[k]) {
 						// update
-						printf("%s <=%d= %s\n", ids[i].name, k, cs->vals.e[k]);
+						//printf("%s <=%d= %s\n", ids[i].name, k, cs->vals.e[k]);
 
 						val.value.enumerated.item[k] = eval;
 						ret = ioctl(fd, SNDRV_CTL_IOCTL_ELEM_WRITE, &val);
@@ -191,97 +192,167 @@ static bool audio_restore_state(struct audio_control_state* controls, int n_cont
 		}
 	}
 
+	for (int j = 0; j < n_controls; j++)
+		if (!controls[j].used)
+			printf("Control \"%s\" is defined in state but not present on the card\n", controls[j].name);
+
 	close(fd);
 	return true;
 }
 
 struct audio_setup {
 	bool mic_on;
-	bool mic_modem_en;
 	bool spk_on;
 	bool hp_on;
 	bool ear_on;
 
 	// when sending audio to modem from AIF1 R, also play that back
 	// to me locally (just like AIF1 L plays just to me)
-	bool play_me_aif1_to_modem;
+	//
+	// this is to monitor what SW is playing to the modem (so that
+	// I can hear my robocaller talking)
+	bool modem_playback_monitor;
 
-	// keep this off untill the call starts, then turn it on
+	// enable modem routes to DAC/from ADC (spk/mic)
+	// digital paths to AIF1 are always on
+	bool to_modem_on;
+	bool from_modem_on;
+
+	// shut off/enable all digital paths to the modem:
+	// keep this off until the call starts, then turn it on
 	bool dai2_en;
 
-	// todo
+	int mic_gain;
 	int spk_vol;
 	int ear_vol;
-	int mic_gain;
+	int hp_vol;
 };
 
 static void audio_set_controls(struct audio_setup* s)
 {
 	struct audio_control_state controls[] = {
-		{ .name = "AIF1 AD0 Capture Volume",                        .vals.i = { 180, 180 } },
-		{ .name = "AIF1 DA0 Playback Volume",                       .vals.i = { 180, 180 } },
-		{ .name = "AIF2 ADC Capture Volume",                        .vals.i = { 181, 181 } },
-		{ .name = "AIF2 DAC Playback Volume",                       .vals.i = { 177, 177 } },
-		{ .name = "ADC Capture Volume",                             .vals.i = { 184, 184 } },
-		{ .name = "DAC Playback Volume",                            .vals.i = { 177, 177 } },
-		{ .name = "Headphone Playback Volume",                      .vals.i = { 51 } },
-		{ .name = "Headphone Playback Switch",                      .vals.i = { !!s->hp_on, !!s->hp_on } },
-		{ .name = "Mic1 Playback Volume",                           .vals.i = { 0 } },
-		{ .name = "Mic1 Boost Volume",                              .vals.i = { 4 } },
-		{ .name = "Mic2 Playback Volume",                           .vals.i = { 0 } },
+		//
+                // Analog input:
+		//
+
+		// Mic 1 (daughterboard)
+		{ .name = "Mic1 Boost Volume",                              .vals.i = { s->mic_gain } },
+
+		// Mic 2 (headphones)
 		{ .name = "Mic2 Boost Volume",                              .vals.i = { 0 } },
-		{ .name = "ADC Gain Capture Volume",                        .vals.i = { 5 } },
-		{ .name = "Line In Playback Volume",                        .vals.i = { 0 } },
-		{ .name = "Line Out Playback Volume",                       .vals.i = { 23 } },
-		{ .name = "Line Out Playback Switch",                       .vals.i = { !!s->spk_on, !!s->spk_on } },
-		{ .name = "Earpiece Playback Volume",                       .vals.i = { 23 } },
-		{ .name = "Earpiece Playback Switch",                       .vals.i = { !!s->ear_on } },
-		{ .name = "AIF1 Loopback Switch",                           .vals.i = { 0 } },
-		{ .name = "AIF2 Loopback Switch",                           .vals.i = { 0 } },
-		{ .name = "AIF1 AD0 Stereo Capture Route",                  .vals.e = { "Stereo", "Stereo" } },
-		{ .name = "AIF2 ADC Stereo Capture Route",                  .vals.e = { "Sum Mono", "Sum Mono" } },
-		{ .name = "AIF1 AD0 Mixer AIF1 DA0 Capture Switch",         .vals.i = { 0, 0 } },
-		{ .name = "AIF1 AD0 Mixer AIF2 DAC Capture Switch",         .vals.i = { 0, 1 } },
-		{ .name = "AIF1 AD0 Mixer ADC Capture Switch",              .vals.i = { 1, 0 } },
-		{ .name = "AIF1 AD0 Mixer AIF2 DAC Rev Capture Switch",     .vals.i = { 0, 0 } },
-		{ .name = "AIF2 ADC Mixer AIF1 DA0 Capture Switch",         .vals.i = { 0, 1 } },
-		{ .name = "AIF2 ADC Mixer AIF2 DAC Rev Capture Switch",     .vals.i = { 0, 0 } },
-		{ .name = "AIF2 ADC Mixer ADC Capture Switch",              .vals.i = { !!s->mic_modem_en && !!s->dai2_en, !!s->mic_modem_en && !!s->dai2_en } },
-		{ .name = "AIF1 DA0 Stereo Playback Route",                 .vals.e = { "Stereo", "Stereo" } },
-		{ .name = "AIF2 DAC Stereo Playback Route",                 .vals.e = { "Sum Mono", "Sum Mono" } },
-		{ .name = "DAC Mixer AIF1 DA0 Playback Switch",             .vals.i = { 1, !!s->play_me_aif1_to_modem } },
-		{ .name = "DAC Mixer AIF2 DAC Playback Switch",             .vals.i = { 0, !!s->dai2_en } },
-		{ .name = "DAC Mixer ADC Playback Switch",                  .vals.i = { 0, 0 } },
-		{ .name = "Headphone Source Playback Route",                .vals.e = { "Mixer", "Mixer" } },
-		{ .name = "Line Out Source Playback Route",                 .vals.e = { "Mono Differential", "Mono Differential" } },
-		{ .name = "Earpiece Source Playback Route",                 .vals.e = { "Left Mixer" } },
-		{ .name = "DAC Playback Switch",                            .vals.i = { 1, 1 } },
-		{ .name = "DAC Reversed Playback Switch",                   .vals.i = { 1, 1 } },
-		{ .name = "Line In Playback Switch",                        .vals.i = { 0, 0 } },
-		{ .name = "Mic1 Playback Switch",                           .vals.i = { 0, 0 } },
-		{ .name = "Mic2 Playback Switch",                           .vals.i = { 0, 0 } },
-		{ .name = "Mixer Capture Switch",                           .vals.i = { 0, 0 } },
-		{ .name = "Mixer Reversed Capture Switch",                  .vals.i = { 0, 0 } },
-		{ .name = "Line In Capture Switch",                         .vals.i = { 0, 0 } },
+
+		// Line in (unused on PP)
+		// no controls yet
+
+                // Input mixers before ADC
+
 		{ .name = "Mic1 Capture Switch",                            .vals.i = { !!s->mic_on, !!s->mic_on } },
 		{ .name = "Mic2 Capture Switch",                            .vals.i = { 0, 0 } },
+		{ .name = "Line In Capture Switch",                         .vals.i = { 0, 0 } }, // Out Mix -> In Mix
+		{ .name = "Mixer Capture Switch",                           .vals.i = { 0, 0 } },
+		{ .name = "Mixer Reversed Capture Switch",                  .vals.i = { 0, 0 } },
+
+		// ADC
+		{ .name = "ADC Gain Capture Volume",                        .vals.i = { 0 } },
+		{ .name = "ADC Capture Volume",                             .vals.i = { 160, 160 } }, // digital gain
+
+		//
+                // Digital paths:
+		//
+
+		// AIF1 (SoC)
+
+		// AIF1 slot0 capture mixer sources
+		{ .name = "AIF1 AD0 Mixer ADC Capture Switch",              .vals.i = { 1, 0 } },
+		{ .name = "AIF1 AD0 Mixer AIF1 DA0 Capture Switch",         .vals.i = { 0, 0 } },
+		{ .name = "AIF1 AD0 Mixer AIF2 DAC Capture Switch",         .vals.i = { 0, 1 } },
+		{ .name = "AIF1 AD0 Mixer AIF2 DAC Rev Capture Switch",     .vals.i = { 0, 0 } }, //XXX: capture right from the left AIF2?
+		{ .name = "AIF1 Loopback Switch",                           .vals.i = { 0 } },
+
+		// AIF1 slot0 capture/playback mono mixing/digital volume
+		{ .name = "AIF1 AD0 Capture Volume",                        .vals.i = { 160, 160 } },
+		{ .name = "AIF1 AD0 Stereo Capture Route",                  .vals.e = { "Stereo", "Stereo" } },
+		{ .name = "AIF1 DA0 Playback Volume",                       .vals.i = { 160, 160 } },
+		{ .name = "AIF1 DA0 Stereo Playback Route",                 .vals.e = { "Stereo", "Stereo" } },
+
+		// AIF2 (modem)
+
+		// AIF2 capture mixer sources
+		{ .name = "AIF2 ADC Mixer ADC Capture Switch",              .vals.i = { !!s->to_modem_on && !!s->dai2_en, 0 } }, // from adc/mic
+		{ .name = "AIF2 ADC Mixer AIF1 DA0 Capture Switch",         .vals.i = { 0, 1 } }, // from aif1 R
+		{ .name = "AIF2 ADC Mixer AIF2 DAC Rev Capture Switch",     .vals.i = { 0, 0 } },
+		{ .name = "AIF2 Loopback Switch",                           .vals.i = { 0 } },
+
+		// AIF2 capture/playback mono mixing/digital volume
+		{ .name = "AIF2 ADC Capture Volume",                        .vals.i = { 160, 160 } },
+		{ .name = "AIF2 DAC Playback Volume",                       .vals.i = { 160, 160 } },
+		{ .name = "AIF2 ADC Stereo Capture Route",                  .vals.e = { "Mix Mono", "Mix Mono" } }, // we mix because we're sending two channels (from mic and AIF1 R)
+		{ .name = "AIF2 DAC Stereo Playback Route",                 .vals.e = { "Sum Mono", "Sum Mono" } },  // we sum because modem is sending a single channel
+
+                // AIF3 (bluetooth)
+
+		{ .name = "AIF3 Loopback Switch",         		    .vals.i = { 0 } },
+		{ .name = "AIF3 ADC Capture Route",                         .vals.e = { "None" } },
+		{ .name = "AIF3 DAC Playback Route",                        .vals.e = { "None" } },
+
+		// DAC
+
+		// DAC input mixers (sources from ADC, and AIF1/2)
+		{ .name = "DAC Mixer ADC Playback Switch",                  .vals.i = { 0, 0 } }, // we don't play our mic to ourselves
+		{ .name = "DAC Mixer AIF1 DA0 Playback Switch",             .vals.i = { 1, !!s->modem_playback_monitor } },
+		{ .name = "DAC Mixer AIF2 DAC Playback Switch",             .vals.i = { 0, !!s->dai2_en && !!s->from_modem_on } },
+
+		//
+		// Analog output:
+		//
+
+		// Output mixer after DAC
+
+		{ .name = "DAC Playback Switch",                            .vals.i = { 1, 1 } },
+		{ .name = "DAC Reversed Playback Switch",                   .vals.i = { 1, 1 } },
+		{ .name = "DAC Playback Volume",                            .vals.i = { 160, 160 } },
+		{ .name = "Mic1 Playback Switch",                           .vals.i = { 0, 0 } },
+		{ .name = "Mic1 Playback Volume",                           .vals.i = { 0 } },
+		{ .name = "Mic2 Playback Switch",                           .vals.i = { 0, 0 } },
+		{ .name = "Mic2 Playback Volume",                           .vals.i = { 0 } },
+		{ .name = "Line In Playback Switch",                        .vals.i = { 0, 0 } },
+		{ .name = "Line In Playback Volume",                        .vals.i = { 0 } },
+
+                // Outputs
+
+		{ .name = "Earpiece Source Playback Route",		    .vals.e = { "Left Mixer" } },
+		{ .name = "Earpiece Playback Switch",                       .vals.i = { !!s->ear_on } },
+		{ .name = "Earpiece Playback Volume",                       .vals.i = { s->ear_vol } },
+
+		{ .name = "Headphone Source Playback Route",                .vals.e = { "Mixer", "Mixer" } },
+		{ .name = "Headphone Playback Switch",                      .vals.i = { !!s->hp_on, !!s->hp_on } },
+		{ .name = "Headphone Playback Volume",                      .vals.i = { s->hp_vol } },
+
+		// Loudspeaker
+		{ .name = "Line Out Source Playback Route",                 .vals.e = { "Mono Differential", "Mono Differential" } },
+		{ .name = "Line Out Playback Switch",                       .vals.i = { !!s->spk_on, !!s->spk_on } },
+		{ .name = "Line Out Playback Volume",                       .vals.i = { s->spk_vol } },
 	};
 
-	audio_restore_state(controls, sizeof(controls) / sizeof(controls[0]));
+	audio_restore_state(controls, ARRAY_SIZE(controls));
 }
 
 static struct audio_setup audio_setup = {
-	.mic_on = false,
-	.mic_modem_en = true,
+	.mic_on = true,
+	.ear_on = true,
 	.spk_on = false,
 	.hp_on = false,
-	.ear_on = false,
-	.play_me_aif1_to_modem = false,
+
+	.from_modem_on = true,
+	.to_modem_on = true,
+	.modem_playback_monitor = false,
+
 	.dai2_en = false,
 
-	//.spk_vol = 50,
-	//.ear_vol = 50,
-	//.mic_gain = 10,
+	.hp_vol = 15,
+	.spk_vol = 15,
+	.ear_vol = 31,
+	.mic_gain = 1,
 };
 
 int main(int ac, char* av[])
