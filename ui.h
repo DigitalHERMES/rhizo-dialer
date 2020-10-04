@@ -73,5 +73,6 @@ GtkWidget *buttonStar;
 GtkWidget *buttonHash;
 GtkWidget *buttonDial;
 GtkWidget *buttonHangup;
+GtkWidget *buttonAnswer;
 
 #endif /* HAVE_UI_H__ */

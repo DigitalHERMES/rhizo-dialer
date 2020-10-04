@@ -33,6 +33,7 @@
 
 #include "ui.h"
 #include "tp.h"
+#include "at.h"
 
 #define MODE_NONE 0
 #define MODE_DIAL 1
@@ -42,13 +43,38 @@
 
 FILE *modem;
 
+bool get_response(char *response)
+{
+    char buf[MAX_BUF_SIZE] = {};
+    char buf2[MAX_BUF_SIZE] = {};
+    char *line;
+    int res;
+  
+    do {
+        line = fgets(buf, (int)sizeof(buf), modem);
+	if (line == NULL) {
+	    fprintf(stderr, "EOF from modem\n");
+	    return false;
+	}
+	strcat(buf2, line);
+
+    } while (! is_final_result(line));
+
+    strip_cr(buf2);
+    strcpy(response, buf2);
+    return true;
+}
+
 gint incoming_call_checker (gpointer data)
 {
-    char cmd[] = "AT+CPAS";
+    char cmd[] = "AT+CPAS\r";
     int res;
     char buf[MAX_BUF_SIZE];
+    char response[MAX_BUF_SIZE];
     char *line;
 
+    // get_response(response);
+    
     res = fputs(cmd, modem);
     if (res < 0)
     {
@@ -56,15 +82,16 @@ gint incoming_call_checker (gpointer data)
         return false;
     }
 
-    line = fgets(buf, MAX_BUF_SIZE, modem);
-
-    if (line == NULL)
+    if (get_response(response))
     {
-        fprintf(stderr, "output is NULL\n");
-    }
-    else
-    {
-        fprintf(stderr, "output: %s\n", line);
+	if (strstr(response, "3") != NULL)
+	{
+	    fprintf(stderr, "Ringing\n");
+	// TODO send a AT+CLCC to see who is calling
+	    gtk_entry_set_text (GTK_ENTRY(display), "!!!RINGING!!!");
+	}
+    
+	fprintf(stderr, "%s\n", response);
     }
     return true;
 
@@ -75,21 +102,33 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     gint result;
     char cmd[MAX_BUF_SIZE];
     int res;
+    char response[MAX_BUF_SIZE];
 
     fprintf(stderr, "Pressed %c\n", key_pressed);
 
     if (key_pressed == 'D')
     {
-        sprintf(cmd, "ATD%s;\n", dial_pad);
+        sprintf(cmd, "ATD%s;\r", dial_pad);
+	fprintf(stderr, "Dial cmd: %s\n", cmd);
         res = fputs(cmd, modem);
+	get_response(response);
     }
 
     if (key_pressed == 'H'){
-        sprintf(cmd, "ATH\n");
+        sprintf(cmd, "ATH\r");
         res = fputs(cmd, modem);
+	get_response(response);
         memset (dial_pad, 0, MAX_PHONE_SIZE);
     }
 
+    if (key_pressed == 'A')
+    {
+        sprintf(cmd, "ATA\r");
+	fprintf(stderr, "Dial cmd: %s\n", cmd);
+        res = fputs(cmd, modem);
+	get_response(response);
+    }
+    
     if ((key_pressed >= '0' && key_pressed <= '9') ||
         key_pressed == '*' ||
         key_pressed == '#')
@@ -255,7 +294,8 @@ int main(int argc, char *argv[])
     buttonHash = gtk_button_new_with_label("#");
     buttonDial = gtk_button_new_with_label("Call");
     buttonHangup = gtk_button_new_with_label("Hangup");
-
+    buttonAnswer = gtk_button_new_with_label("Answer");
+    
     g_signal_connect(G_OBJECT(button9), "clicked", G_CALLBACK(callback_button_pressed), (void *) '9');
     g_signal_connect(G_OBJECT(button8), "clicked", G_CALLBACK(callback_button_pressed), (void *) '8');
     g_signal_connect(G_OBJECT(button7), "clicked", G_CALLBACK(callback_button_pressed), (void *) '7');
@@ -270,7 +310,7 @@ int main(int argc, char *argv[])
     g_signal_connect(G_OBJECT(buttonHash), "clicked", G_CALLBACK(callback_button_pressed), (void *) '#');
     g_signal_connect(G_OBJECT(buttonDial), "clicked", G_CALLBACK(callback_button_pressed), (void *) 'D');
     g_signal_connect(G_OBJECT(buttonHangup), "clicked", G_CALLBACK(callback_button_pressed), (void *) 'H');
-
+    g_signal_connect(G_OBJECT(buttonAnswer), "clicked", G_CALLBACK(callback_button_pressed), (void *) 'A');
 
     gtk_container_add(GTK_CONTAINER(hbox1), button1);
     gtk_container_add(GTK_CONTAINER(hbox1), button2);
@@ -285,8 +325,9 @@ int main(int argc, char *argv[])
     gtk_container_add(GTK_CONTAINER(hbox4), button0);
     gtk_container_add(GTK_CONTAINER(hbox4), buttonHash);
     gtk_container_add(GTK_CONTAINER(hbox5), buttonDial);
-    gtk_container_add(GTK_CONTAINER(hbox5), buttonHangup);
-
+    gtk_container_add(GTK_CONTAINER(hbox5), buttonHangup);    
+    gtk_container_add(GTK_CONTAINER(hbox5), buttonAnswer);
+    
     gtk_container_add(GTK_CONTAINER(vbox), display);
     gtk_container_add(GTK_CONTAINER(vbox), hbox1);
     gtk_container_add(GTK_CONTAINER(vbox), hbox2);
@@ -301,9 +342,9 @@ int main(int argc, char *argv[])
     g_signal_connect(G_OBJECT(window), "delete_event",
       G_CALLBACK(gtk_main_quit), NULL);
 
-    //    g_timeout_add(1000, incoming_call_checker, NULL);
+    g_timeout_add(1200, incoming_call_checker, NULL);
 
-    modem = fopen(modem_path, "r+");
+    modem = fopen(modem_path, "r+b");
 
     if (modem == NULL)
     {
