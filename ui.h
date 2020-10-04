@@ -35,6 +35,8 @@
 
 // max msisdn number size
 #define MAX_PHONE_SIZE 512
+#define MAX_MODEM_PATH 4096
+#define MAX_BUF_SIZE 4096
 
 // Hildon stuff
 #include <hildon/hildon-banner.h>

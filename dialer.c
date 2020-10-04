@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <stdbool.h>
 
 #include <telepathy-glib/telepathy-glib.h>
 #include <telepathy-glib/telepathy-glib-dbus.h>
@@ -39,15 +40,54 @@
 #define MODE_HANGUP 3
 #define MODE_DIAL_PAD 4
 
+FILE *modem;
+
+gint incoming_call_checker (gpointer data)
+{
+    char cmd[] = "AT+CPAS";
+    int res;
+    char buf[MAX_BUF_SIZE]
+    char *line;
+
+    res = fputs(cmd, modem);
+    if (res < 0)
+    {
+        fprintf(stderr, "Error writing to the modem\n");
+        return false;
+    }
+
+    line = fgets(buf, MAX_BUF_SIZE, modem);
+
+    if (line == NULL)
+    {
+        fprintf(stderr, "output is NULL\n", line);
+    }
+    else
+    {
+        fprintf(stderr, "output: %s\n", line);
+    }
+    return true;
+
+}
 
 void callback_button_pressed(GtkWidget * widget, char key_pressed)
 {
     gint result;
+    char cmd[MAX_BUF_SIZE];
 
     fprintf(stderr, "Pressed %c\n", key_pressed);
 
-    if (key_pressed == 'H')
+    if (key_pressed == 'D')
+    {
+        sprintf(cmd, "ATD%s;\n", dial_pad);
+        res = fputs(cmd, modem);
+    }
+
+    if (key_pressed == 'H'){
+        sprintf(cmd, "ATH\n");
+        res = fputs(cmd, modem);
         memset (dial_pad, 0, MAX_PHONE_SIZE);
+    }
 
     if ((key_pressed >= '0' && key_pressed <= '9') ||
         key_pressed == '*' ||
@@ -94,11 +134,37 @@ TP_DTMF_EVENT_ASTERISK
 // https://git.sailfishos.org/mer-core/voicecall/tree/master/plugins/providers/telepathy
 // https://git.sailfishos.org/mer-core/voicecall/blob/master/plugins/providers/telepathy/src/telepathyproviderplugin.cpp#L106
 // /usr/share/ofono/scripts/enable-modem /usr/share/ofono/scripts/online-modem
+
+// Querying IMEI:
+//AT+CGSN
+
+// Query IMSI
+//AT+CIMI
+
+// Signal quality
+// AT+CSQ
+
+// Query registration
+// AT+CREG?
+
+// Query operator
+// AT+COPS?
+
+// Query call state
+// AT+CLCC
+
+// with this I can see if someone is calling, and drop an ATA...
+// Query ME state
+// AT+CPAS
+
+
+
 int main(int argc, char *argv[])
 {
-
+    char modem_path[MAX_MODEM_PATH];
     char msisdn[MAX_PHONE_SIZE];
     int mode = MODE_NONE;
+    boot set_alsa = true;
 
     if (argc < 2){
     usage_info:
@@ -109,10 +175,12 @@ int main(int argc, char *argv[])
         fprintf(stderr, "    -a                      Answer an incoming call\n");
         fprintf(stderr, "    -h                      Hangup current call\n");
         fprintf(stderr, "    -p                      Open Dial Pad\n");
+        fprintf(stderr, "    -m <modem AT device>    Modem AT device\n");
+        fprintf(stderr, "    -s                      Set alsa routing option (right now - no option yet!)\n");
         return EXIT_SUCCESS;
     }
     int opt;
-    while ((opt = getopt(argc, argv, "d:ahp")) != -1){
+    while ((opt = getopt(argc, argv, "d:ahpm:s")) != -1){
         switch (opt){
         case 'd':
             strncpy (msisdn, optarg, MAX_PHONE_SIZE);
@@ -126,6 +194,11 @@ int main(int argc, char *argv[])
             break;
         case 'p':
             mode = MODE_DIAL_PAD;
+            break;
+        case 'm':
+            strncpy (modem_path, optarg, MAX_MODEM_PATH);
+            break;
+        case 's':
             break;
         default:
             fprintf(stderr, "Wrong command line.\n");
@@ -226,6 +299,10 @@ int main(int argc, char *argv[])
     g_signal_connect(G_OBJECT(window), "delete_event",
       G_CALLBACK(gtk_main_quit), NULL);
 
+    g_timeout_add(1000, incoming_call_checker, NULL);
+
+    modem = fopen(modem_path, "r+");
+
     // Lets dial?
     //https://megous.com/dl/tmp/modem.txt
 
@@ -275,6 +352,7 @@ out:
     if (bus_daemon != NULL)
         g_object_unref (bus_daemon);
 
+    fclose(modem);
 
   return exit_code;
 }
