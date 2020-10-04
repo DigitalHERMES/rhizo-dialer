@@ -34,6 +34,7 @@
 #include "ui.h"
 #include "tp.h"
 #include "at.h"
+#include "audio_setup.h"
 
 #define MODE_NONE 0
 #define MODE_DIAL 1
@@ -115,26 +116,28 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     if (key_pressed == 'D')
     {
         sprintf(cmd, "ATD%s;\r", dial_pad);
-	fprintf(stderr, "Dial cmd: %s\n", cmd);
+        fprintf(stderr, "Dial cmd: %s\n", cmd);
         res = fputs(cmd, modem);
-	get_response(response);
+        get_response(response);
+        call_audio_setup();
     }
 
     if (key_pressed == 'H'){
         sprintf(cmd, "ATH\r");
         res = fputs(cmd, modem);
-	get_response(response);
+        get_response(response);
         memset (dial_pad, 0, MAX_PHONE_SIZE);
     }
 
     if (key_pressed == 'A')
     {
         sprintf(cmd, "ATA\r");
-	fprintf(stderr, "Dial cmd: %s\n", cmd);
+        fprintf(stderr, "Dial cmd: %s\n", cmd);
         res = fputs(cmd, modem);
-	get_response(response);
+        get_response(response);
+        call_audio_setup();
     }
-    
+
     if ((key_pressed >= '0' && key_pressed <= '9') ||
         key_pressed == '*' ||
         key_pressed == '#')

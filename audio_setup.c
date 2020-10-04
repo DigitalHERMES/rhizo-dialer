@@ -355,10 +355,9 @@ static struct audio_setup audio_setup = {
 	.mic_gain = 1,
 };
 
-int main(int ac, char* av[])
+int call_audio_setup()
 {
-	int opt;
-
+#if 0
 	while ((opt = getopt(ac, av, "smhe2")) != -1) {
 		switch (opt) {
 		case 's':
@@ -381,7 +380,9 @@ int main(int ac, char* av[])
 			exit(EXIT_FAILURE);
 		}
 	}
-
+#endif
 	audio_set_controls(&audio_setup);
-	return 0;
+        audio_setup.dai2_en = 1;
+        audio_set_controls(&audio_setup);
+        return 0;
 }

@@ -6,7 +6,7 @@ LDFLAGS=`pkg-config --libs $(LIBRARIES)`
 
 all: dialer audio_setup
 
-dialer: dialer.o tp.o at.o
+dialer: dialer.o tp.o at.o audio_setup.o
 	$(CC) $(LDFLAGS) dialer.o tp.o at.o -o dialer
 
 dialer.o: dialer.c ui.h
@@ -18,12 +18,12 @@ tp.o: tp.c tp.h
 at.o: at.c at.h
 	$(CC) $(CFLAGS) -c -o at.o at.c
 
-audio_setup: audio_setup.c
-	$(CC) -o audio_setup audio_setup.c
+audio_setup.o: audio_setup.c audio_setup.h
+	$(CC) $(CFLAGS) -c -o audio_setup.o audio_setup.c
 
 install:
 	install -d /usr/bin
 	install dialer /usr/bin
 
 clean:
-	rm -f dialer.o tp.o dialer audio_setup
+	rm -f dialer.o tp.o dialer audio_setup.o
