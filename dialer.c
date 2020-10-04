@@ -54,11 +54,12 @@ bool get_response(char *response)
         line = fgets(buf, (int)sizeof(buf), modem);
 	if (line == NULL) {
 	    fprintf(stderr, "EOF from modem\n");
+	    clearerr(modem);
 	    return false;
 	}
 	strcat(buf2, line);
 
-    } while (! is_final_result(line));
+    } while ( !is_final_result(line));
 
     strip_cr(buf2);
     strcpy(response, buf2);
@@ -77,7 +78,8 @@ gint incoming_call_checker (gpointer data)
     if (res < 0)
     {
         fprintf(stderr, "Error writing to the modem\n");
-        return false;
+	clearerr(modem);
+        return true; // I shold be returning false here... may be.
     }
 
     if (get_response(response))
@@ -86,13 +88,19 @@ gint incoming_call_checker (gpointer data)
         {
             fprintf(stderr, "Ringing\n");
             // TODO send a AT+CLCC to see who is calling
-            gtk_entry_set_text (GTK_ENTRY(display), "!!!RINGING!!!");
             gtk_widget_show(GTK_WIDGET(window));
+            gtk_entry_set_text (GTK_ENTRY(display), "!!!RINGING!!!");
         }
         fprintf(stderr, "%s\n", response);
     }
     return true;
 
+}
+
+gboolean hide_instead(GtkWidget * widget, char key_pressed)
+{
+    gtk_widget_hide(GTK_WIDGET(window));
+    return TRUE;
 }
 
 void callback_button_pressed(GtkWidget * widget, char key_pressed)
@@ -341,8 +349,8 @@ int main(int argc, char *argv[])
     gtk_container_add(GTK_CONTAINER(window), vbox);
 
     /* Connect signal to X in the upper corner */
-    g_signal_connect(G_OBJECT(window), "delete_event",
-      G_CALLBACK(gtk_main_quit), NULL);
+    //    g_signal_connect(G_OBJECT(window), "delete_event", G_CALLBACK(gtk_main_quit), NULL);
+    g_signal_connect(G_OBJECT(window), "delete-event", G_CALLBACK(hide_instead), NULL);
 
     g_timeout_add(1200, incoming_call_checker, NULL);
 
@@ -395,7 +403,7 @@ int main(int argc, char *argv[])
     gtk_widget_show_all(GTK_WIDGET(window));
 
     if (mode != MODE_DIAL_PAD)
-        gtk_widget_hide(GTK_WIDGET(window);
+        gtk_widget_hide(GTK_WIDGET(window));
 
     gtk_main();
 
