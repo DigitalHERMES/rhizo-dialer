@@ -61,9 +61,9 @@ bool is_final_result(const char * const response)
 		}
 		return false;
 	case 'N':
-		if (strcmp(&response[1], "O ANSWER\r\n") == 0) {
-			return true;
-		}
+	        //		if (strcmp(&response[1], "O ANSWER\r\n") == 0) {
+	        //return true;
+	        //}
 		//		if (strcmp(&response[1], "O CARRIER\r\n") == 0) {
 		//			return true;
 		//		}
