@@ -29,6 +29,10 @@
 #include <inttypes.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <sound/asound.h>
 #include <sound/tlv.h>
@@ -381,8 +385,11 @@ int call_audio_setup()
 		}
 	}
 #endif
+	fprintf(stderr, "calling audio setup\n");
+	audio_setup.dai2_en = 0;
 	audio_set_controls(&audio_setup);
         audio_setup.dai2_en = 1;
         audio_set_controls(&audio_setup);
+
         return 0;
 }
