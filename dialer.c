@@ -73,8 +73,6 @@ gint incoming_call_checker (gpointer data)
     char response[MAX_BUF_SIZE];
     char *line;
 
-    // get_response(response);
-    
     res = fputs(cmd, modem);
     if (res < 0)
     {
@@ -84,14 +82,14 @@ gint incoming_call_checker (gpointer data)
 
     if (get_response(response))
     {
-	if (strstr(response, "3") != NULL)
-	{
-	    fprintf(stderr, "Ringing\n");
-	// TODO send a AT+CLCC to see who is calling
-	    gtk_entry_set_text (GTK_ENTRY(display), "!!!RINGING!!!");
-	}
-    
-	fprintf(stderr, "%s\n", response);
+        if (strstr(response, "3") != NULL)
+        {
+            fprintf(stderr, "Ringing\n");
+            // TODO send a AT+CLCC to see who is calling
+            gtk_entry_set_text (GTK_ENTRY(display), "!!!RINGING!!!");
+            gtk_widget_show(GTK_WIDGET(window));
+        }
+        fprintf(stderr, "%s\n", response);
     }
     return true;
 
@@ -212,15 +210,16 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Usage example: %s -d 99991234\n\n", argv[0]);
         fprintf(stderr, "OPTIONS:\n");
         fprintf(stderr, "    -d <phone_number>       Dial to a given phone number\n");
-        fprintf(stderr, "    -a                      Answer an incoming call\n");
-        fprintf(stderr, "    -h                      Hangup current call\n");
+        fprintf(stderr, "    -h                      Show this help\n");
+        fprintf(stderr, "    -a                      Answer a call\n");
+        fprintf(stderr, "    -t                      Terminate a call\n");
         fprintf(stderr, "    -p                      Open Dial Pad\n");
         fprintf(stderr, "    -m <modem AT device>    Modem AT device\n");
         fprintf(stderr, "    -s                      Set alsa routing option (right now - no option yet!)\n");
         return EXIT_SUCCESS;
     }
     int opt;
-    while ((opt = getopt(argc, argv, "d:ahpm:s")) != -1){
+    while ((opt = getopt(argc, argv, "d:ahtpm:s")) != -1){
         switch (opt){
         case 'd':
             strncpy (msisdn, optarg, MAX_PHONE_SIZE);
@@ -230,6 +229,9 @@ int main(int argc, char *argv[])
             mode = MODE_ANSWER;
             break;
         case 'h':
+            goto usage_info;
+            break;
+        case 't':
             mode = MODE_HANGUP;
             break;
         case 'p':
@@ -239,7 +241,7 @@ int main(int argc, char *argv[])
             strncpy (modem_path, optarg, MAX_MODEM_PATH);
             break;
         case 's':
-	    set_alsa = true;
+            set_alsa = true;
             break;
         default:
             fprintf(stderr, "Wrong command line.\n");
@@ -391,6 +393,10 @@ int main(int argc, char *argv[])
 
     /* Begin the main application */
     gtk_widget_show_all(GTK_WIDGET(window));
+
+    if (mode != MODE_DIAL_PAD)
+        gtk_widget_hide(GTK_WIDGET(window);
+
     gtk_main();
 
 out:
