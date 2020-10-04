@@ -46,7 +46,7 @@ gint incoming_call_checker (gpointer data)
 {
     char cmd[] = "AT+CPAS";
     int res;
-    char buf[MAX_BUF_SIZE]
+    char buf[MAX_BUF_SIZE];
     char *line;
 
     res = fputs(cmd, modem);
@@ -60,7 +60,7 @@ gint incoming_call_checker (gpointer data)
 
     if (line == NULL)
     {
-        fprintf(stderr, "output is NULL\n", line);
+        fprintf(stderr, "output is NULL\n");
     }
     else
     {
@@ -74,6 +74,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 {
     gint result;
     char cmd[MAX_BUF_SIZE];
+    int res;
 
     fprintf(stderr, "Pressed %c\n", key_pressed);
 
@@ -164,7 +165,7 @@ int main(int argc, char *argv[])
     char modem_path[MAX_MODEM_PATH];
     char msisdn[MAX_PHONE_SIZE];
     int mode = MODE_NONE;
-    boot set_alsa = true;
+    bool set_alsa = false;
 
     if (argc < 2){
     usage_info:
@@ -199,6 +200,7 @@ int main(int argc, char *argv[])
             strncpy (modem_path, optarg, MAX_MODEM_PATH);
             break;
         case 's':
+	    set_alsa = true;
             break;
         default:
             fprintf(stderr, "Wrong command line.\n");
@@ -299,10 +301,15 @@ int main(int argc, char *argv[])
     g_signal_connect(G_OBJECT(window), "delete_event",
       G_CALLBACK(gtk_main_quit), NULL);
 
-    g_timeout_add(1000, incoming_call_checker, NULL);
+    //    g_timeout_add(1000, incoming_call_checker, NULL);
 
     modem = fopen(modem_path, "r+");
 
+    if (modem == NULL)
+    {
+        fprintf(stderr, "Could not open modem\n");
+    }
+    
     // Lets dial?
     //https://megous.com/dl/tmp/modem.txt
 
