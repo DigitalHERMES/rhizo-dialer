@@ -38,14 +38,14 @@
 
 FILE *modem;
 guint timer;
-bool set_alsa = false;
+bool set_alsa;
 
 void sig_handler(int sig_num)
 {
     char response[MAX_BUF_SIZE];
 
     if(sig_num == SIGINT)
-    {
+      {
         printf("\n Caught the SIGINT signal. Exiting...\n");
         gtk_timeout_remove(timer);
         sleep(2);
@@ -69,12 +69,12 @@ gint incoming_call_checker (gpointer data)
 {
     char cmd[MAX_BUF_SIZE];
     int res;
-    char buf[MAX_BUF_SIZE];
     char response[MAX_BUF_SIZE];
-    char *line;
 
     sprintf(cmd, "AT+CPAS\r");
 
+    fprintf(stderr, "aqui\n");
+    
     res = fputs(cmd, modem);
     if (res < 0)
     {
@@ -105,7 +105,7 @@ gint incoming_call_checker (gpointer data)
 
             // TODO send a AT+CLCC to see who is calling
             gtk_widget_show(GTK_WIDGET(window));
-            gtk_entry_set_hildon_entry_set_text((HildonEntry *)display, "!!!RINGING!!!");
+            hildon_entry_set_text((HildonEntry *)display, "!!!RINGING!!!");
             /* Show the dialog */
             //gtk_widget_show_all(GTK_WIDGET(dialog));
             /* Wait for user to select OK or CANCEL */
@@ -116,9 +116,6 @@ gint incoming_call_checker (gpointer data)
         }
         fprintf(stderr, "%s\n", response);
     }
-
-    // just to keep things clean...
-    get_response(response, modem);
 
     return true;
 
@@ -132,11 +129,10 @@ gboolean hide_instead(GtkWidget * widget, char key_pressed)
 
 void callback_button_pressed(GtkWidget * widget, char key_pressed)
 {
-    gint result;
     char cmd[MAX_BUF_SIZE];
-    int res;
     char response[MAX_BUF_SIZE];
-
+    int res;
+    
     fprintf(stderr, "Pressed %c\n", key_pressed);
 
     if (key_pressed == 'D')
@@ -144,6 +140,12 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
         sprintf(cmd, "ATD%s;\r", dial_pad);
         fprintf(stderr, "Dial cmd: %s\n", cmd);
         res = fputs(cmd, modem);
+	if (res < 0)
+	{
+	    fprintf(stderr, "Error writing to the modem\n");
+	    clearerr(modem);
+	    return;
+	}
         get_response(response, modem);
         if (set_alsa)
             call_audio_setup();
@@ -152,7 +154,13 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     if (key_pressed == 'H'){
         sprintf(cmd, "ATH\r");
         res = fputs(cmd, modem);
-        get_response(response);
+	if (res < 0)
+	{
+	    fprintf(stderr, "Error writing to the modem\n");
+	    clearerr(modem);
+	    return;
+	}
+        get_response(response, modem);
         memset (dial_pad, 0, MAX_PHONE_SIZE);
     }
 
@@ -161,7 +169,13 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
         sprintf(cmd, "ATA\r");
         fprintf(stderr, "Dial cmd: %s\n", cmd);
         res = fputs(cmd, modem);
-        get_response(response);
+	if (res < 0)
+	{
+	    fprintf(stderr, "Error writing to the modem\n");
+	    clearerr(modem);
+	    return;
+	}
+        get_response(response, modem);
         if (set_alsa)
             call_audio_setup();
     }
@@ -174,7 +188,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
         dial_pad[strlen(dial_pad)] = 0;
     }
 
-    gtk_entry_set_hildon_entry_set_text((HildonEntry *)display, dial_pad);
+    hildon_entry_set_text((HildonEntry *)display, dial_pad);
 
 #if 0
 // play correct DTMF event
@@ -223,7 +237,8 @@ int main(int argc, char *argv[])
     char modem_path[MAX_MODEM_PATH];
     char msisdn[MAX_PHONE_SIZE];
     int mode = MODE_NONE;
-
+    set_alsa = false;
+    
     if (argc < 2){
     usage_info:
         fprintf(stderr, "Usage: %s [-d <phone_number>] [-a] [-h] [-p]\n", argv[0]);
@@ -236,20 +251,10 @@ int main(int argc, char *argv[])
         return EXIT_SUCCESS;
     }
     int opt;
-    while ((opt = getopt(argc, argv, "d:ahtpm:s")) != -1){
+    while ((opt = getopt(argc, argv, "hpm:s")) != -1){
         switch (opt){
-        case 'd':
-            strncpy (msisdn, optarg, MAX_PHONE_SIZE);
-            mode = MODE_DIAL;
-            break;
-        case 'a':
-            mode = MODE_ANSWER;
-            break;
         case 'h':
             goto usage_info;
-            break;
-        case 't':
-            mode = MODE_HANGUP;
             break;
         case 'p':
             mode = MODE_DIAL_PAD;
@@ -389,5 +394,5 @@ out:
 
     fclose(modem);
 
-  return exit_code;
+  return EXIT_SUCCESS;
 }

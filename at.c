@@ -20,8 +20,14 @@
  *
  */
 
+#include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <sys/ioctl.h>
+
+#include "at.h"
+
+#define MAX_BUF_SIZE 4096
 
 bool get_response(char *response, FILE *modem)
 {
@@ -30,8 +36,11 @@ bool get_response(char *response, FILE *modem)
     char *line;
     int res;
 
+    fprintf(stderr, "fileno = %d\n", fileno(modem));
+    
     do {
-        if (ioctl(fileno(modem), FIONREAD, &res) < 0)
+#if 0
+      if (ioctl(fileno(modem), FIONREAD, &res) < 0)
         {
             fprintf(stderr, "Error in ioctl()\n");
             clearerr(modem);
@@ -40,9 +49,10 @@ bool get_response(char *response, FILE *modem)
 
         if (res < 1)
         {
+	    fprintf(stderr, "no data!\n");
             return false;
         }
-
+#endif
         line = fgets(buf, (int)sizeof(buf), modem);
         if (line == NULL) {
             fprintf(stderr, "EOF from modem\n");
