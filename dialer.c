@@ -242,6 +242,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 // Query ME state
 // AT+CPAS
 
+    // Send ATZ and set it to ring (see setup-modem.sh from maemo)
 
 
 int main(int argc, char *argv[])
