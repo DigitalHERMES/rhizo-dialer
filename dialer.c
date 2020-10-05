@@ -74,7 +74,7 @@ gint incoming_call_checker (gpointer data)
     sprintf(cmd, "AT+CPAS\r");
 
     fprintf(stderr, "incoming call checker\n");
-    
+
     res = fputs(cmd, modem);
     if (res < 0)
     {
@@ -389,6 +389,21 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "Could not open modem\n");
     }
+
+    char cmd[MAX_BUF_SIZE];
+    sprintf(cmd, "ATZ\r");
+    int res = fputs(cmd, modem);
+    if (res < 0)
+    {
+        fprintf(stderr, "Error writing to the modem\n");
+        return EXIT_FAILURE;
+    }
+    if (get_response(response, modem))
+        fprintf(stderr, "%s\n", response);
+    else
+        fprintf(stderr, "Problems with AT chat\n");
+
+    // send ATZ
 
 //    GMainLoop *mainloop = g_main_loop_new (NULL, FALSE);
 //    g_main_loop_run (mainloop);
