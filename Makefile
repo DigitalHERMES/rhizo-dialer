@@ -6,8 +6,8 @@ LDFLAGS=`pkg-config --libs $(LIBRARIES)`
 
 all: dialer audio_setup
 
-dialer: dialer.o tp.o at.o audio_setup.o
-	$(CC) $(LDFLAGS) dialer.o tp.o at.o -o dialer
+dialer: dialer.o at.o audio_setup.o
+	$(CC) $(LDFLAGS) dialer.o at.o -o dialer
 
 dialer.o: dialer.c ui.h
 	$(CC) $(CFLAGS) -c -o dialer.o dialer.c

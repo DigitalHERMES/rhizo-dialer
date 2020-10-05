@@ -28,5 +28,7 @@
 void strip_cr(char *s);
 
 bool is_final_result(const char * const response);
-  
-#endif // 
+
+bool get_response(char *response, FILE *modem)
+
+#endif // HAVE_AT_H__

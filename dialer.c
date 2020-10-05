@@ -27,73 +27,99 @@
 #include <string.h>
 #include <getopt.h>
 #include <stdbool.h>
-
-#include <telepathy-glib/telepathy-glib.h>
-#include <telepathy-glib/telepathy-glib-dbus.h>
+#include <signal.h>
 
 #include "ui.h"
-#include "tp.h"
-#include "at.h"
-#include "audio_setup.h"
+#include "at.h" // at helpers
+#include "audio_setup.h" // alsa audio routing
 
 #define MODE_NONE 0
-#define MODE_DIAL 1
-#define MODE_ANSWER 2
-#define MODE_HANGUP 3
-#define MODE_DIAL_PAD 4
+#define MODE_DIAL_PAD 1
 
 FILE *modem;
+guint timer;
 
-bool get_response(char *response)
+
+void sig_handler(int sig_num)
 {
-    char buf[MAX_BUF_SIZE] = {};
-    char buf2[MAX_BUF_SIZE] = {};
-    char *line;
-    int res;
-  
-    do {
-        line = fgets(buf, (int)sizeof(buf), modem);
-	if (line == NULL) {
-	    fprintf(stderr, "EOF from modem\n");
-	    clearerr(modem);
-	    return false;
-	}
-	strcat(buf2, line);
+    char response[MAX_BUF_SIZE];
 
-    } while ( !is_final_result(line));
+    if(sig_num == SIGINT)
+    {
+        printf("\n Caught the SIGINT signal. Exiting...\n");
+        gtk_timeout_remove(timer);
+        sleep(2);
+        get_response(response, modem);
+        fclose(modem);
+        exit(EXIT_SUCCESS);
+    }
+    else if (sig_num == SIGUSR1)
+    {
+        printf("\n Caught the SIGUSR1 - showing dial pad\n");
+        gtk_widget_show(GTK_WIDGET(window));
+    }
+    else
+    {
+        printf("\n Caught the signal number [%d]\n", sig_num);
+    }
 
-    strip_cr(buf2);
-    strcpy(response, buf2);
-    return true;
 }
 
 gint incoming_call_checker (gpointer data)
 {
-    char cmd[] = "AT+CPAS\r";
+    char cmd[MAX_BUF_SIZE];
     int res;
     char buf[MAX_BUF_SIZE];
     char response[MAX_BUF_SIZE];
     char *line;
 
+    sprintf(cmd, "AT+CPAS\r");
+
     res = fputs(cmd, modem);
     if (res < 0)
     {
         fprintf(stderr, "Error writing to the modem\n");
-	clearerr(modem);
+        clearerr(modem);
         return true; // I shold be returning false here... may be.
     }
 
-    if (get_response(response))
+    if (get_response(response, modem))
     {
+        fprintf(stderr, "%s\n", response);
         if (strstr(response, "3") != NULL)
         {
-            fprintf(stderr, "Ringing\n");
+            fprintf(stderr, "Ringing!\n");
+            sprintf(cmd, "AT+CLCC\r");
+            res = fputs(cmd, modem);
+            if (res < 0)
+            {
+                fprintf(stderr, "Error writing to the modem\n");
+                clearerr(modem);
+                return true; // I shold be returning false here... may be.
+            }
+            if (get_response(response, modem))
+            {
+                fprintf(stderr, "%s\n", response);
+                // parse the number...
+            }
+
             // TODO send a AT+CLCC to see who is calling
             gtk_widget_show(GTK_WIDGET(window));
-            gtk_entry_set_text (GTK_ENTRY(display), "!!!RINGING!!!");
+            gtk_entry_set_hildon_entry_set_text((HildonEntry *)display, "!!!RINGING!!!");
+            /* Show the dialog */
+            //gtk_widget_show_all(GTK_WIDGET(dialog));
+            /* Wait for user to select OK or CANCEL */
+            //result = gtk_dialog_run(GTK_DIALOG(dialog));
+            /* Close the dialog */
+            // gtk_widget_destroy(GTK_WIDGET(dialog));
+
         }
         fprintf(stderr, "%s\n", response);
     }
+
+    // just to keep things clean...
+    get_response(response, modem);
+
     return true;
 
 }
@@ -118,7 +144,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
         sprintf(cmd, "ATD%s;\r", dial_pad);
         fprintf(stderr, "Dial cmd: %s\n", cmd);
         res = fputs(cmd, modem);
-        get_response(response);
+        get_response(response, modem);
         call_audio_setup();
     }
 
@@ -146,35 +172,17 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
         dial_pad[strlen(dial_pad)] = 0;
     }
 
-    gtk_entry_set_text (GTK_ENTRY(display), dial_pad);
+    gtk_entry_set_hildon_entry_set_text((HildonEntry *)display, dial_pad);
 
 #if 0
 // play correct DTMF event
     switch(key_pressed)
     {
     case '1':
-        TP_DTMF_EVENT_DIGIT_1;
+        // play DTMF...
         break;
         ...
-TP_DTMF_EVENT_DIGIT_2
-TP_DTMF_EVENT_DIGIT_3
-TP_DTMF_EVENT_DIGIT_4
-TP_DTMF_EVENT_DIGIT_5
-TP_DTMF_EVENT_DIGIT_6
-TP_DTMF_EVENT_DIGIT_7
-TP_DTMF_EVENT_DIGIT_8
-TP_DTMF_EVENT_DIGIT_9
-TP_DTMF_EVENT_HASH
-TP_DTMF_EVENT_DIGIT_0
-TP_DTMF_EVENT_ASTERISK
 #endif
-
-    /* Show the dialog */
-    //gtk_widget_show_all(GTK_WIDGET(dialog));
-    /* Wait for user to select OK or CANCEL */
-    //result = gtk_dialog_run(GTK_DIALOG(dialog));
-    /* Close the dialog */
-    // gtk_widget_destroy(GTK_WIDGET(dialog));
 
 }
 
@@ -220,10 +228,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Usage: %s [-d <phone_number>] [-a] [-h] [-p]\n", argv[0]);
         fprintf(stderr, "Usage example: %s -d 99991234\n\n", argv[0]);
         fprintf(stderr, "OPTIONS:\n");
-        fprintf(stderr, "    -d <phone_number>       Dial to a given phone number\n");
         fprintf(stderr, "    -h                      Show this help\n");
-        fprintf(stderr, "    -a                      Answer a call\n");
-        fprintf(stderr, "    -t                      Terminate a call\n");
         fprintf(stderr, "    -p                      Open Dial Pad\n");
         fprintf(stderr, "    -m <modem AT device>    Modem AT device\n");
         fprintf(stderr, "    -s                      Set alsa routing option (right now - no option yet!)\n");
@@ -265,6 +270,8 @@ int main(int argc, char *argv[])
         exit (-1);
     }
 
+    signal(SIGINT, sig_handler);
+    signal(SIGUSR1, sig_handler);
 
     /* Create the hildon program and setup the title */
     program = HILDON_PROGRAM(hildon_program_get_instance());
@@ -274,7 +281,7 @@ int main(int argc, char *argv[])
     window = HILDON_WINDOW(hildon_window_new());
     hildon_program_add_window(program, window);
 
-    hildon_gtk_window_set_portrait_flags(GTK_WINDOW(window), HILDON_PORTRAIT_MODE_SUPPORT); // or HILDON_PORTRAIT_MODE_REQUEST  ?
+    hildon_gtk_window_set_portrait_flags(GTK_WINDOW(window), HILDON_PORTRAIT_MODE_REQUEST); // or HILDON_PORTRAIT_MODE_SUPPORT  ?
 
     // TODO: Use Hildon widgets!
     // http://maemo.org/api_refs/5.0/5.0-final/hildon/
@@ -286,7 +293,7 @@ int main(int argc, char *argv[])
     hbox4 = gtk_hbox_new(TRUE, 5);
     hbox5 = gtk_hbox_new(TRUE, 5);
 
-    display = gtk_entry_new();
+    display = hildon_entry_new (HILDON_SIZE_AUTO);
     gtk_entry_set_alignment (GTK_ENTRY(display), 0.5);
     gtk_editable_set_editable (GTK_EDITABLE (display), FALSE);
 
@@ -355,7 +362,7 @@ int main(int argc, char *argv[])
     //    g_signal_connect(G_OBJECT(window), "delete_event", G_CALLBACK(gtk_main_quit), NULL);
     g_signal_connect(G_OBJECT(window), "delete-event", G_CALLBACK(hide_instead), NULL);
 
-    g_timeout_add(1200, incoming_call_checker, NULL);
+    timer = g_timeout_add(1200, incoming_call_checker, NULL);
 
     modem = fopen(modem_path, "r+b");
 
@@ -363,44 +370,9 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "Could not open modem\n");
     }
-    
-    // Lets dial?
-    //https://megous.com/dl/tmp/modem.txt
 
-    // nothing works yet, just playing with telepathy...
-
-    GMainLoop *mainloop = g_main_loop_new (NULL, FALSE);
-    int exit_code = EXIT_SUCCESS;
-    TpDBusDaemon *bus_daemon;
-    TpDTMFEvent DTMFevent;
-    GError *error = NULL;
-
-    bus_daemon = tp_dbus_daemon_dup (&error);
-
-    if (bus_daemon == NULL)
-    {
-        g_warning ("%s", error->message);
-        g_error_free (error);
-        exit_code = EXIT_FAILURE;
-        goto out;
-    }
-
-    // set for verbosity
-    tp_debug_set_flags ("all");
-
-    tp_list_connection_names (bus_daemon, got_connections, mainloop, NULL, NULL);
-    tp_list_connection_managers_async (bus_daemon, got_connection_managers, mainloop);
-
-// playground
-    TpConnectionManager *phone_manager = tp_connection_manager_new (bus_daemon, "phone_manager", "ofono", &error);
-    TpConnectionManagerProtocol phone_protocol;
-    phone_protocol.name = "tel";
-
-    tp_connection_manager_activate(phone_manager);
-    tp_connection_init_known_interfaces ();
-// end playground
-
-    g_main_loop_run (mainloop);
+//    GMainLoop *mainloop = g_main_loop_new (NULL, FALSE);
+//    g_main_loop_run (mainloop);
 
     /* Begin the main application */
     gtk_widget_show_all(GTK_WIDGET(window));
@@ -411,11 +383,8 @@ int main(int argc, char *argv[])
     gtk_main();
 
 out:
-    if (mainloop != NULL)
-        g_main_loop_unref (mainloop);
-
-    if (bus_daemon != NULL)
-        g_object_unref (bus_daemon);
+//    if (mainloop != NULL)
+//        g_main_loop_unref (mainloop);
 
     fclose(modem);
 

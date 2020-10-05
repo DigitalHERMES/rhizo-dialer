@@ -23,6 +23,42 @@
 #include <string.h>
 #include <stdbool.h>
 
+bool get_response(char *response, FILE *modem)
+{
+    char buf[MAX_BUF_SIZE] = {};
+    char buf2[MAX_BUF_SIZE] = {};
+    char *line;
+    int res;
+
+    do {
+        if (ioctl(fileno(modem), FIONREAD, &res) < 0)
+        {
+            fprintf(stderr, "Error in ioctl()\n");
+            clearerr(modem);
+            return false;
+        }
+
+        if (res < 1)
+        {
+            return false;
+        }
+
+        line = fgets(buf, (int)sizeof(buf), modem);
+        if (line == NULL) {
+            fprintf(stderr, "EOF from modem\n");
+            clearerr(modem);
+            return false;
+        }
+        strcat(buf2, line);
+
+    } while ( !is_final_result(line));
+
+    strip_cr(buf2);
+    strcpy(response, buf2);
+    return true;
+}
+
+
 void strip_cr(char *s)
 {
 	char *from, *to;
@@ -64,9 +100,9 @@ bool is_final_result(const char * const response)
 		if (strcmp(&response[1], "O ANSWER\r\n") == 0) {
 			return true;
 		}
-		//		if (strcmp(&response[1], "O CARRIER\r\n") == 0) {
-		//			return true;
-		//		}
+                if (strcmp(&response[1], "O CARRIER\r\n") == 0) {
+                    return true;
+                }
 		if (strcmp(&response[1], "O DIALTONE\r\n") == 0) {
 			return true;
 		}
