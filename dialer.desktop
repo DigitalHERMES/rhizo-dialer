@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Name=Dialer
+Comment=Rhizomatica Dialer
+Exec=/usr/bin/dialer -m /dev/EG25.AT -s -p
+Icon=rhizo_dialer_icon
+Type=Application
+Categories=Telephony;
+X-HildonDesk-ShowInToolbar=true
+X-Osso-Service=dialer
+X-Osso-Type=application/x-executable

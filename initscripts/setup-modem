@@ -1,0 +1,15 @@
+#!/sbin/openrc-run
+
+depend() {
+	after eg25
+	before ofono
+}
+
+start() {
+	ebegin "Setting up modem"
+#	/usr/sbin/setup-modem.sh
+}
+
+stop() {
+	ebegin "Stopping modem (noop)"
+}

@@ -36,7 +36,6 @@ bool get_response(char *response, FILE *modem)
     char *line;
     int res;
 
-    fprintf(stderr, "fileno = %d\n", fileno(modem));
     
     do {
 #if 0
@@ -56,7 +55,7 @@ bool get_response(char *response, FILE *modem)
         line = fgets(buf, (int)sizeof(buf), modem);
         if (line == NULL) {
             fprintf(stderr, "EOF from modem\n");
-            clearerr(modem);
+	    clearerr(modem);
             return false;
         }
         strcat(buf2, line);

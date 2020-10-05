@@ -24,6 +24,10 @@ audio_setup.o: audio_setup.c audio_setup.h
 install:
 	install -d /usr/bin
 	install dialer /usr/bin
+	install -d /usr/share/icons/
+	install rhizo_dialer_icon.png /usr/share/icons/
+	install -d /usr/share/applications/hildon/
+	install dialer.desktop /usr/share/applications/hildon/
 
 clean:
 	rm -f dialer.o at.o tp.o audio_setup.o dialer

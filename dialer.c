@@ -73,7 +73,7 @@ gint incoming_call_checker (gpointer data)
 
     sprintf(cmd, "AT+CPAS\r");
 
-    fprintf(stderr, "aqui\n");
+    fprintf(stderr, "incoming call checker\n");
     
     res = fputs(cmd, modem);
     if (res < 0)
@@ -89,6 +89,7 @@ gint incoming_call_checker (gpointer data)
         if (strstr(response, "3") != NULL)
         {
             fprintf(stderr, "Ringing!\n");
+#if 0
             sprintf(cmd, "AT+CLCC\r");
             res = fputs(cmd, modem);
             if (res < 0)
@@ -102,7 +103,7 @@ gint incoming_call_checker (gpointer data)
                 fprintf(stderr, "%s\n", response);
                 // parse the number...
             }
-
+#endif
             // TODO send a AT+CLCC to see who is calling
             gtk_widget_show(GTK_WIDGET(window));
             hildon_entry_set_text((HildonEntry *)display, "!!!RINGING!!!");
@@ -135,6 +136,12 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     
     fprintf(stderr, "Pressed %c\n", key_pressed);
 
+    if (key_pressed == 'D' || key_pressed == 'H' || key_pressed == 'A')
+    {
+        gtk_timeout_remove(timer);
+	usleep(400000);
+    }
+    
     if (key_pressed == 'D')
     {
         sprintf(cmd, "ATD%s;\r", dial_pad);
@@ -146,7 +153,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 	    clearerr(modem);
 	    return;
 	}
-        get_response(response, modem);
+	get_response(response, modem);
         if (set_alsa)
             call_audio_setup();
     }
@@ -160,7 +167,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 	    clearerr(modem);
 	    return;
 	}
-        get_response(response, modem);
+	get_response(response, modem);
         memset (dial_pad, 0, MAX_PHONE_SIZE);
     }
 
@@ -175,11 +182,16 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 	    clearerr(modem);
 	    return;
 	}
-        get_response(response, modem);
+	get_response(response, modem);
         if (set_alsa)
             call_audio_setup();
     }
 
+    if (key_pressed == 'D' || key_pressed == 'H' || key_pressed == 'A')
+    {
+	g_timeout_add(1200, incoming_call_checker, NULL);
+    }
+    
     if ((key_pressed >= '0' && key_pressed <= '9') ||
         key_pressed == '*' ||
         key_pressed == '#')

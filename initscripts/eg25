@@ -1,0 +1,26 @@
+#!/sbin/openrc-run
+
+description="Starting EG25 WWAN module"
+
+depend() {
+	before ofono
+}
+
+start() {
+	ebegin "Enabling EG25 WWAN module"
+	# GPIO35 is PWRKEY
+	# GPIO68 is RESET_N
+	# GPIO232 is W_DISABLE#
+	echo 1 > /sys/class/modem-power/modem-power/device/powered || return 1
+
+	while [ `cat /sys/class/modem-power/modem-power/device/powered` -eq "0" ]; do
+	    sleep 1
+    	done
+}
+
+stop() {
+	ebegin "Disabling EG25 WWAN module"
+	echo 0 > /sys/class/modem-power/modem-power/device/powered || return 1
+
+	sleep 30 # Wait for the module to power off
+}
