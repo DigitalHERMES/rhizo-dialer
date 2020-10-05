@@ -391,6 +391,7 @@ int main(int argc, char *argv[])
     }
 
     char cmd[MAX_BUF_SIZE];
+    char response[MAX_BUF_SIZE];
     sprintf(cmd, "ATZ\r");
     int res = fputs(cmd, modem);
     if (res < 0)
