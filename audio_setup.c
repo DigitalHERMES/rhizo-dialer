@@ -15,6 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * 2020-09-29: Updated for the new Samuel's digital codec driver
  */
 
 #include <assert.h>
@@ -29,10 +31,6 @@
 #include <inttypes.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 #include <sound/asound.h>
 #include <sound/tlv.h>
@@ -267,11 +265,10 @@ static void audio_set_controls(struct audio_setup* s)
 		// AIF1 (SoC)
 
 		// AIF1 slot0 capture mixer sources
-		{ .name = "AIF1 AD0 Mixer ADC Capture Switch",              .vals.i = { 1, 0 } },
-		{ .name = "AIF1 AD0 Mixer AIF1 DA0 Capture Switch",         .vals.i = { 0, 0 } },
-		{ .name = "AIF1 AD0 Mixer AIF2 DAC Capture Switch",         .vals.i = { 0, 1 } },
-		{ .name = "AIF1 AD0 Mixer AIF2 DAC Rev Capture Switch",     .vals.i = { 0, 0 } }, //XXX: capture right from the left AIF2?
-		{ .name = "AIF1 Loopback Switch",                           .vals.i = { 0 } },
+		{ .name = "AIF1 Data Digital ADC Capture Switch",           .vals.i = { 1, 0 } },
+		{ .name = "AIF1 Slot 0 Digital ADC Capture Switch",         .vals.i = { 0, 0 } },
+		{ .name = "AIF2 Digital ADC Capture Switch",                .vals.i = { 0, 1 } },
+		{ .name = "AIF2 Inv Digital ADC Capture Switch",            .vals.i = { 0, 0 } }, //XXX: capture right from the left AIF2?
 
 		// AIF1 slot0 capture/playback mono mixing/digital volume
 		{ .name = "AIF1 AD0 Capture Volume",                        .vals.i = { 160, 160 } },
@@ -285,7 +282,6 @@ static void audio_set_controls(struct audio_setup* s)
 		{ .name = "AIF2 ADC Mixer ADC Capture Switch",              .vals.i = { !!s->to_modem_on && !!s->dai2_en, 0 } }, // from adc/mic
 		{ .name = "AIF2 ADC Mixer AIF1 DA0 Capture Switch",         .vals.i = { 0, 1 } }, // from aif1 R
 		{ .name = "AIF2 ADC Mixer AIF2 DAC Rev Capture Switch",     .vals.i = { 0, 0 } },
-		{ .name = "AIF2 Loopback Switch",                           .vals.i = { 0 } },
 
 		// AIF2 capture/playback mono mixing/digital volume
 		{ .name = "AIF2 ADC Capture Volume",                        .vals.i = { 160, 160 } },
@@ -295,16 +291,15 @@ static void audio_set_controls(struct audio_setup* s)
 
                 // AIF3 (bluetooth)
 
-		{ .name = "AIF3 Loopback Switch",         		    .vals.i = { 0 } },
-		{ .name = "AIF3 ADC Capture Route",                         .vals.e = { "None" } },
-		{ .name = "AIF3 DAC Playback Route",                        .vals.e = { "None" } },
+		{ .name = "AIF3 ADC Source Capture Route",                  .vals.e = { "None" } },
+		{ .name = "AIF2 DAC Source Playback Route",                 .vals.e = { "AIF2" } },
 
 		// DAC
 
 		// DAC input mixers (sources from ADC, and AIF1/2)
-		{ .name = "DAC Mixer ADC Playback Switch",                  .vals.i = { 0, 0 } }, // we don't play our mic to ourselves
-		{ .name = "DAC Mixer AIF1 DA0 Playback Switch",             .vals.i = { 1, !!s->modem_playback_monitor } },
-		{ .name = "DAC Mixer AIF2 DAC Playback Switch",             .vals.i = { 0, !!s->dai2_en && !!s->from_modem_on } },
+		{ .name = "ADC Digital DAC Playback Switch",                .vals.i = { 0, 0 } }, // we don't play our mic to ourselves
+		{ .name = "AIF1 Slot 0 Digital DAC Playback Switch",        .vals.i = { 1, !!s->modem_playback_monitor } },
+		{ .name = "AIF2 Digital DAC Playback Switch",               .vals.i = { 0, !!s->dai2_en && !!s->from_modem_on } },
 
 		//
 		// Analog output:
@@ -362,6 +357,8 @@ static struct audio_setup audio_setup = {
 int call_audio_setup()
 {
 #if 0
+        int opt;
+
 	while ((opt = getopt(ac, av, "smhe2")) != -1) {
 		switch (opt) {
 		case 's':
@@ -385,11 +382,11 @@ int call_audio_setup()
 		}
 	}
 #endif
-	fprintf(stderr, "calling audio setup\n");
+	fprintf(stderr, "Audio setup called\n");
 	audio_setup.dai2_en = 0;
 	audio_set_controls(&audio_setup);
         audio_setup.dai2_en = 1;
         audio_set_controls(&audio_setup);
 
-        return 0;
+	return 0;
 }
