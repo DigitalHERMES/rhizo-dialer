@@ -1,10 +1,10 @@
 CC=gcc
 # LIBRARIES=gconf-2.0 hildon-1 hildon-fm-2 gtk+-2.0 libosso gdk-2.0 gconf-2.0 gnome-vfs-2.0
 LIBRARIES=gconf-2.0 hildon-1 gtk+-2.0 libosso gdk-2.0 gconf-2.0 telepathy-glib
-CFLAGS= -Wall -std=c11 `pkg-config --cflags $(LIBRARIES)`
+CFLAGS= -Wall -std=gnu11 `pkg-config --cflags $(LIBRARIES)`
 LDFLAGS=`pkg-config --libs $(LIBRARIES)`
 
-all: dialer audio_setup
+all: dialer
 
 dialer: dialer.o at.o audio_setup.o
 	$(CC) $(LDFLAGS) dialer.o at.o -o dialer
@@ -26,4 +26,4 @@ install:
 	install dialer /usr/bin
 
 clean:
-	rm -f dialer.o tp.o dialer audio_setup.o
+	rm -f dialer.o at.o tp.o audio_setup.o dialer

@@ -38,7 +38,7 @@
 
 FILE *modem;
 guint timer;
-
+bool set_alsa = false;
 
 void sig_handler(int sig_num)
 {
@@ -145,7 +145,8 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
         fprintf(stderr, "Dial cmd: %s\n", cmd);
         res = fputs(cmd, modem);
         get_response(response, modem);
-        call_audio_setup();
+        if (set_alsa)
+            call_audio_setup();
     }
 
     if (key_pressed == 'H'){
@@ -161,7 +162,8 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
         fprintf(stderr, "Dial cmd: %s\n", cmd);
         res = fputs(cmd, modem);
         get_response(response);
-        call_audio_setup();
+        if (set_alsa)
+            call_audio_setup();
     }
 
     if ((key_pressed >= '0' && key_pressed <= '9') ||
@@ -221,7 +223,6 @@ int main(int argc, char *argv[])
     char modem_path[MAX_MODEM_PATH];
     char msisdn[MAX_PHONE_SIZE];
     int mode = MODE_NONE;
-    bool set_alsa = false;
 
     if (argc < 2){
     usage_info:
