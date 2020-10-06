@@ -53,6 +53,7 @@ char dial_pad[MAX_PHONE_SIZE];
 
 /* Create buttons and add it to main view */
 GtkWidget *vbox;
+GtkWidget *hbox0;
 GtkWidget *hbox1;
 GtkWidget *hbox2;
 GtkWidget *hbox3;
@@ -69,6 +70,8 @@ GtkWidget *button3;
 GtkWidget *button2;
 GtkWidget *button1;
 GtkWidget *button0;
+GtkWidget *buttonBack;
+GtkWidget *buttonPlus;
 GtkWidget *buttonStar;
 GtkWidget *buttonHash;
 GtkWidget *buttonDial;

@@ -133,7 +133,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     char cmd[MAX_BUF_SIZE];
     char response[MAX_BUF_SIZE];
     int res;
-    
+
     fprintf(stderr, "Pressed %c\n", key_pressed);
 
     if (key_pressed == 'D' || key_pressed == 'H' || key_pressed == 'A')
@@ -189,14 +189,20 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 
     if (key_pressed == 'D' || key_pressed == 'H' || key_pressed == 'A')
     {
-	g_timeout_add(1200, incoming_call_checker, NULL);
+        g_timeout_add(1200, incoming_call_checker, NULL);
     }
-    
+
     if ((key_pressed >= '0' && key_pressed <= '9') ||
         key_pressed == '*' ||
-        key_pressed == '#')
+        key_pressed == '#' ||
+        key_pressed == '+')
     {
         dial_pad[strlen(dial_pad)] = key_pressed;
+        dial_pad[strlen(dial_pad)] = 0;
+    }
+
+    if (key_pressed == 'B')
+    {
         dial_pad[strlen(dial_pad)] = 0;
     }
 
@@ -250,8 +256,9 @@ int main(int argc, char *argv[])
     char modem_path[MAX_MODEM_PATH];
     char msisdn[MAX_PHONE_SIZE];
     int mode = MODE_NONE;
+    bool daemonize = false;
     set_alsa = false;
-    
+
     if (argc < 2){
     usage_info:
         fprintf(stderr, "Usage: %s [-d <phone_number>] [-a] [-h] [-p]\n", argv[0]);
@@ -261,10 +268,11 @@ int main(int argc, char *argv[])
         fprintf(stderr, "    -p                      Open Dial Pad\n");
         fprintf(stderr, "    -m <modem AT device>    Modem AT device\n");
         fprintf(stderr, "    -s                      Set alsa routing option (right now - no option yet!)\n");
+        fprintf(stderr, "    -d                      Daemonize\n");
         return EXIT_SUCCESS;
     }
     int opt;
-    while ((opt = getopt(argc, argv, "hpm:s")) != -1){
+    while ((opt = getopt(argc, argv, "hpm:sd")) != -1){
         switch (opt){
         case 'h':
             goto usage_info;
@@ -277,6 +285,9 @@ int main(int argc, char *argv[])
             break;
         case 's':
             set_alsa = true;
+            break;
+        case 'd':
+            daemonize = true;
             break;
         default:
             fprintf(stderr, "Wrong command line.\n");
@@ -306,6 +317,7 @@ int main(int argc, char *argv[])
     // http://maemo.org/api_refs/5.0/5.0-final/hildon/
     /* Create buttons and add it to main view */
     vbox = gtk_vbox_new(TRUE, 5);
+    hbox0 = gtk_hbox_new(TRUE, 5);
     hbox1 = gtk_hbox_new(TRUE, 5);
     hbox2 = gtk_hbox_new(TRUE, 5);
     hbox3 = gtk_hbox_new(TRUE, 5);
@@ -314,7 +326,7 @@ int main(int argc, char *argv[])
 
     display = hildon_entry_new (HILDON_SIZE_AUTO);
     gtk_entry_set_alignment (GTK_ENTRY(display), 0.5);
-    gtk_editable_set_editable (GTK_EDITABLE (display), FALSE);
+    gtk_editable_set_editable (GTK_EDITABLE (display), TRUE); // may be this should be false?
 
     button9 = gtk_button_new_with_label("9");
 //    button9 = hildon_gtk_button_new(HILDON_SIZE_AUTO);
@@ -334,7 +346,11 @@ int main(int argc, char *argv[])
     buttonDial = gtk_button_new_with_label("Call");
     buttonHangup = gtk_button_new_with_label("Hangup");
     buttonAnswer = gtk_button_new_with_label("Answer");
-    
+    buttonBack = gtk_button_new_with_label("<-"); // delete char
+    buttonPlus = hildon_gtk_button_new(HILDON_SIZE_FINGER_HEIGHT);
+    gtk_button_set_label (buttonPlus,"+");
+
+
     g_signal_connect(G_OBJECT(button9), "clicked", G_CALLBACK(callback_button_pressed), (void *) '9');
     g_signal_connect(G_OBJECT(button8), "clicked", G_CALLBACK(callback_button_pressed), (void *) '8');
     g_signal_connect(G_OBJECT(button7), "clicked", G_CALLBACK(callback_button_pressed), (void *) '7');
@@ -350,7 +366,11 @@ int main(int argc, char *argv[])
     g_signal_connect(G_OBJECT(buttonDial), "clicked", G_CALLBACK(callback_button_pressed), (void *) 'D');
     g_signal_connect(G_OBJECT(buttonHangup), "clicked", G_CALLBACK(callback_button_pressed), (void *) 'H');
     g_signal_connect(G_OBJECT(buttonAnswer), "clicked", G_CALLBACK(callback_button_pressed), (void *) 'A');
+    g_signal_connect(G_OBJECT(buttonBack), "clicked", G_CALLBACK(callback_button_pressed), (void *) 'B');
+    g_signal_connect(G_OBJECT(buttonPlus), "clicked", G_CALLBACK(callback_button_pressed), (void *) '+');
 
+    gtk_container_add(GTK_CONTAINER(hbox0), display);
+    gtk_container_add(GTK_CONTAINER(hbox0), buttonBack);
     gtk_container_add(GTK_CONTAINER(hbox1), button1);
     gtk_container_add(GTK_CONTAINER(hbox1), button2);
     gtk_container_add(GTK_CONTAINER(hbox1), button3);
@@ -366,8 +386,9 @@ int main(int argc, char *argv[])
     gtk_container_add(GTK_CONTAINER(hbox5), buttonDial);
     gtk_container_add(GTK_CONTAINER(hbox5), buttonHangup);    
     gtk_container_add(GTK_CONTAINER(hbox5), buttonAnswer);
-    
-    gtk_container_add(GTK_CONTAINER(vbox), display);
+    gtk_container_add(GTK_CONTAINER(hbox5), buttonPlus);
+
+    gtk_container_add(GTK_CONTAINER(vbox), hbox0);
     gtk_container_add(GTK_CONTAINER(vbox), hbox1);
     gtk_container_add(GTK_CONTAINER(vbox), hbox2);
     gtk_container_add(GTK_CONTAINER(vbox), hbox3);
