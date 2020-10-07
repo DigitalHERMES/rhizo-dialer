@@ -33,23 +33,20 @@
 #ifndef HAVE_UI_H__
 #define HAVE_UI_H__
 
-// max msisdn number size
-#define MAX_PHONE_SIZE 512
-#define MAX_MODEM_PATH 4096
-#define MAX_BUF_SIZE 4096
-
 // Hildon stuff
 #include <hildon/hildon-banner.h>
 #include <hildon/hildon-program.h>
 #include <hildon/hildon.h>
 #include <gtk/gtk.h>
 
+#include "at.h"
+
 /* Hildon/GTK stuff */
 HildonProgram *program;
 HildonWindow *window;
 
 GtkWidget *display;
-char dial_pad[MAX_PHONE_SIZE];
+char dial_pad[MAX_BUF_SIZE];
 
 /* Create buttons and add it to main view */
 GtkWidget *vbox;

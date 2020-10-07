@@ -28,29 +28,33 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <threads.h>
 
 #include "ui.h"
-#include "at.h" // at helpers
+#include "at.h" // at and modem helpers
 #include "audio_setup.h" // alsa audio routing
 
 #define MODE_NONE 0
 #define MODE_DIAL_PAD 1
 
 FILE *modem;
+
+int modem_fd;
+
 guint timer;
 bool set_alsa;
 
 void sig_handler(int sig_num)
 {
-    char response[MAX_BUF_SIZE];
+  //    char response[MAX_BUF_SIZE];
 
     if(sig_num == SIGINT)
       {
         printf("\n Caught the SIGINT signal. Exiting...\n");
         gtk_timeout_remove(timer);
         sleep(2);
-        get_response(response, modem);
-        fclose(modem);
+	//        get_response(response, modem);
+	fclose(modem);
         exit(EXIT_SUCCESS);
     }
     else if (sig_num == SIGUSR1)
@@ -70,11 +74,13 @@ gint incoming_call_checker (gpointer data)
     char cmd[MAX_BUF_SIZE];
     int res;
     char response[MAX_BUF_SIZE];
-
+    static int tiktoc = false;
+    
     sprintf(cmd, "AT+CPAS\r");
 
     fprintf(stderr, "incoming call checker\n");
 
+#if 0
     res = fputs(cmd, modem);
     if (res < 0)
     {
@@ -82,12 +88,14 @@ gint incoming_call_checker (gpointer data)
         clearerr(modem);
         return true; // I shold be returning false here... may be.
     }
+#endif
+    
 
     if (get_response(response, modem))
-    {
+      {
         fprintf(stderr, "%s\n", response);
-        if (strstr(response, "3") != NULL)
-        {
+        if (strstr(response, "RING") != NULL)
+	{
             fprintf(stderr, "Ringing!\n");
 #if 0
             sprintf(cmd, "AT+CLCC\r");
@@ -144,7 +152,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     
     if (key_pressed == 'D')
     {
-        sprintf(cmd, "ATD%s;\r", dial_pad);
+        snprintf(cmd, MAX_BUF_SIZE, "ATD%s;\r", dial_pad);
         fprintf(stderr, "Dial cmd: %s\n", cmd);
         res = fputs(cmd, modem);
 	if (res < 0)
@@ -168,7 +176,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 	    return;
 	}
 	get_response(response, modem);
-        memset (dial_pad, 0, MAX_PHONE_SIZE);
+        memset (dial_pad, 0, MAX_BUF_SIZE);
     }
 
     if (key_pressed == 'A')
@@ -189,7 +197,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 
     if (key_pressed == 'D' || key_pressed == 'H' || key_pressed == 'A')
     {
-        g_timeout_add(1200, incoming_call_checker, NULL);
+        g_timeout_add(1500, incoming_call_checker, NULL);
     }
 
     if ((key_pressed >= '0' && key_pressed <= '9') ||
@@ -203,7 +211,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 
     if (key_pressed == 'B')
     {
-        dial_pad[strlen(dial_pad)] = 0;
+        dial_pad[strlen(dial_pad)-1] = 0;
     }
 
     hildon_entry_set_text((HildonEntry *)display, dial_pad);
@@ -254,7 +262,6 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 int main(int argc, char *argv[])
 {
     char modem_path[MAX_MODEM_PATH];
-    char msisdn[MAX_PHONE_SIZE];
     int mode = MODE_NONE;
     bool daemonize = false;
     set_alsa = false;
@@ -317,7 +324,7 @@ int main(int argc, char *argv[])
     // http://maemo.org/api_refs/5.0/5.0-final/hildon/
     /* Create buttons and add it to main view */
     vbox = gtk_vbox_new(TRUE, 5);
-    hbox0 = gtk_hbox_new(TRUE, 5);
+    hbox0 = gtk_table_new(1, 3, FALSE);
     hbox1 = gtk_hbox_new(TRUE, 5);
     hbox2 = gtk_hbox_new(TRUE, 5);
     hbox3 = gtk_hbox_new(TRUE, 5);
@@ -346,9 +353,11 @@ int main(int argc, char *argv[])
     buttonDial = gtk_button_new_with_label("Call");
     buttonHangup = gtk_button_new_with_label("Hangup");
     buttonAnswer = gtk_button_new_with_label("Answer");
-    buttonBack = gtk_button_new_with_label("<-"); // delete char
-    buttonPlus = hildon_gtk_button_new(HILDON_SIZE_FINGER_HEIGHT);
-    gtk_button_set_label (buttonPlus,"+");
+    buttonBack = hildon_gtk_button_new(HILDON_SIZE_THUMB_HEIGHT);
+    gtk_button_set_label (GTK_BUTTON(buttonBack),"<--");
+    
+    buttonPlus = hildon_gtk_button_new(HILDON_SIZE_AUTO); // was HILDON_SIZE_FINGER_HEIGHT
+    gtk_button_set_label (GTK_BUTTON(buttonPlus),"+");
 
 
     g_signal_connect(G_OBJECT(button9), "clicked", G_CALLBACK(callback_button_pressed), (void *) '9');
@@ -369,8 +378,10 @@ int main(int argc, char *argv[])
     g_signal_connect(G_OBJECT(buttonBack), "clicked", G_CALLBACK(callback_button_pressed), (void *) 'B');
     g_signal_connect(G_OBJECT(buttonPlus), "clicked", G_CALLBACK(callback_button_pressed), (void *) '+');
 
-    gtk_container_add(GTK_CONTAINER(hbox0), display);
-    gtk_container_add(GTK_CONTAINER(hbox0), buttonBack);
+
+    gtk_table_attach(GTK_TABLE(hbox0), display, 0, 1, 0, 1, GTK_EXPAND | GTK_FILL, GTK_EXPAND | GTK_FILL, 5, 5);
+    gtk_table_attach(GTK_TABLE(hbox0), buttonBack, 1, 2, 0, 1, GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, 5, 5);
+ 
     gtk_container_add(GTK_CONTAINER(hbox1), button1);
     gtk_container_add(GTK_CONTAINER(hbox1), button2);
     gtk_container_add(GTK_CONTAINER(hbox1), button3);
@@ -404,31 +415,42 @@ int main(int argc, char *argv[])
 
     timer = g_timeout_add(1200, incoming_call_checker, NULL);
 
-    modem = fopen(modem_path, "r+b");
 
-    if (modem == NULL)
+    fprintf(stderr, "aqui 1\n");
+    
+    modem_fd = open_serial_port(modem_path);
+
+
+    if (modem_fd == -1)
     {
         fprintf(stderr, "Could not open modem\n");
+	return EXIT_FAILURE;
     }
+    
+    set_fixed_baudrate("115200", modem_fd);
+   
+    // remove-me!
+    modem = fdopen(modem_fd, "r+");
 
     char cmd[MAX_BUF_SIZE];
     char response[MAX_BUF_SIZE];
+
+    fprintf(stderr, "aqui 2\n");
+
     sprintf(cmd, "ATZ\r");
     int res = fputs(cmd, modem);
+    fprintf(stderr, "aqui 3\n");
     if (res < 0)
     {
         fprintf(stderr, "Error writing to the modem\n");
         return EXIT_FAILURE;
     }
+
     if (get_response(response, modem))
         fprintf(stderr, "%s\n", response);
     else
         fprintf(stderr, "Problems with AT chat\n");
-
-    // send ATZ
-
-//    GMainLoop *mainloop = g_main_loop_new (NULL, FALSE);
-//    g_main_loop_run (mainloop);
+    fprintf(stderr, "aqui 4\n");
 
     /* Begin the main application */
     gtk_widget_show_all(GTK_WIDGET(window));
@@ -438,11 +460,7 @@ int main(int argc, char *argv[])
 
     gtk_main();
 
-out:
-//    if (mainloop != NULL)
-//        g_main_loop_unref (mainloop);
-
     fclose(modem);
 
-  return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }
