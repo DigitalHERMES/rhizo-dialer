@@ -37,8 +37,6 @@
 #define MODE_NONE 0
 #define MODE_DIAL_PAD 1
 
-FILE *modem;
-
 int modem_fd;
 
 guint timer;
@@ -51,10 +49,9 @@ void sig_handler(int sig_num)
     if(sig_num == SIGINT)
       {
         printf("\n Caught the SIGINT signal. Exiting...\n");
-        gtk_timeout_remove(timer);
         sleep(2);
 	//        get_response(response, modem);
-	fclose(modem);
+	close(modem_fd);
         exit(EXIT_SUCCESS);
     }
     else if (sig_num == SIGUSR1)
@@ -265,17 +262,19 @@ int main(int argc, char *argv[])
     int mode = MODE_NONE;
     bool daemonize = false;
     set_alsa = false;
+    int backend = BACKEND_AT;
 
     if (argc < 2){
     usage_info:
-        fprintf(stderr, "Usage: %s [-d <phone_number>] [-a] [-h] [-p]\n", argv[0]);
+        fprintf(stderr, "Usage: %s [-h] [-p] [-s] [-d] -m modem_dev\n", argv[0]);
         fprintf(stderr, "Usage example: %s -d 99991234\n\n", argv[0]);
         fprintf(stderr, "OPTIONS:\n");
         fprintf(stderr, "    -h                      Show this help\n");
         fprintf(stderr, "    -p                      Open Dial Pad\n");
-        fprintf(stderr, "    -m <modem AT device>    Modem AT device\n");
         fprintf(stderr, "    -s                      Set alsa routing option (right now - no option yet!)\n");
         fprintf(stderr, "    -d                      Daemonize\n");
+        fprintf(stderr, "    -m <modem AT device>    Modem AT device\n");
+        fprintf(stderr, "    -b <at, ofono>          Choose between AT and ofono backends (not working yet)");
         return EXIT_SUCCESS;
     }
     int opt;
@@ -355,7 +354,7 @@ int main(int argc, char *argv[])
     buttonAnswer = gtk_button_new_with_label("Answer");
     buttonBack = hildon_gtk_button_new(HILDON_SIZE_THUMB_HEIGHT);
     gtk_button_set_label (GTK_BUTTON(buttonBack),"<--");
-    
+
     buttonPlus = hildon_gtk_button_new(HILDON_SIZE_AUTO); // was HILDON_SIZE_FINGER_HEIGHT
     gtk_button_set_label (GTK_BUTTON(buttonPlus),"+");
 
@@ -381,7 +380,7 @@ int main(int argc, char *argv[])
 
     gtk_table_attach(GTK_TABLE(hbox0), display, 0, 1, 0, 1, GTK_EXPAND | GTK_FILL, GTK_EXPAND | GTK_FILL, 5, 5);
     gtk_table_attach(GTK_TABLE(hbox0), buttonBack, 1, 2, 0, 1, GTK_SHRINK | GTK_FILL, GTK_SHRINK | GTK_FILL, 5, 5);
- 
+
     gtk_container_add(GTK_CONTAINER(hbox1), button1);
     gtk_container_add(GTK_CONTAINER(hbox1), button2);
     gtk_container_add(GTK_CONTAINER(hbox1), button3);
@@ -395,7 +394,7 @@ int main(int argc, char *argv[])
     gtk_container_add(GTK_CONTAINER(hbox4), button0);
     gtk_container_add(GTK_CONTAINER(hbox4), buttonHash);
     gtk_container_add(GTK_CONTAINER(hbox5), buttonDial);
-    gtk_container_add(GTK_CONTAINER(hbox5), buttonHangup);    
+    gtk_container_add(GTK_CONTAINER(hbox5), buttonHangup);
     gtk_container_add(GTK_CONTAINER(hbox5), buttonAnswer);
     gtk_container_add(GTK_CONTAINER(hbox5), buttonPlus);
 
@@ -413,22 +412,31 @@ int main(int argc, char *argv[])
     //    g_signal_connect(G_OBJECT(window), "delete_event", G_CALLBACK(gtk_main_quit), NULL);
     g_signal_connect(G_OBJECT(window), "delete-event", G_CALLBACK(hide_instead), NULL);
 
-    timer = g_timeout_add(1200, incoming_call_checker, NULL);
 
-
-    fprintf(stderr, "aqui 1\n");
-    
-    modem_fd = open_serial_port(modem_path);
-
-
-    if (modem_fd == -1)
+    if (backend == BACKEND_AT)
     {
-        fprintf(stderr, "Could not open modem\n");
-	return EXIT_FAILURE;
+        // Modem initialization
+        modem_fd = open_serial_port(modem_path);
+
+        if (modem_fd == -1)
+        {
+            fprintf(stderr, "Could not open modem\n");
+            return EXIT_FAILURE;
+        }
+
+        // make this a parameter?
+        set_fixed_baudrate("115200", modem_fd);
+
+        bool at_res = run_at_backend(modem_fd);
+        if (at_red == false)
+        {
+            fprintf(stderr, "at error\n");
+            return EXIT_FAILURE;
+        }
     }
-    
-    set_fixed_baudrate("115200", modem_fd);
-   
+
+
+#if 0
     // remove-me!
     modem = fdopen(modem_fd, "r+");
 
@@ -452,6 +460,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Problems with AT chat\n");
     fprintf(stderr, "aqui 4\n");
 
+#endif
+
     /* Begin the main application */
     gtk_widget_show_all(GTK_WIDGET(window));
 
@@ -460,7 +470,6 @@ int main(int argc, char *argv[])
 
     gtk_main();
 
-    fclose(modem);
-
+    close (modem_fd);
     return EXIT_SUCCESS;
 }
