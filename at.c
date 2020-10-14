@@ -31,8 +31,10 @@
 #include <strings.h>
 #include <asm/termbits.h>
 #include <errno.h>
+#include <threads.h>
 
 #include "at.h"
+#include "ring-audio.h"
 
 struct baudrate {
     char       *name;
@@ -65,7 +67,7 @@ bool get_response(char *response, FILE *modem)
     strcpy(response, buf2);
     return true;
 }
-
+#endif
 
 void strip_cr(char *s)
 {
@@ -235,10 +237,11 @@ void safe_output(unsigned char *buf, int cc)
 
 int loop(void *arg)
 {
-    int target_fd = (int)*arg;
-    char buf[MAX_BUF_SIZE];
-    fd_set fds, fds1;
-    int i, cc, max;
+  int *target_fd_ptr = (int *)arg;
+  int target_fd = *target_fd_ptr;
+  char buf[MAX_BUF_SIZE];
+  fd_set fds, fds1;
+  int i, cc, max;
 
     FD_ZERO(&fds);
     FD_SET(target_fd, &fds);
@@ -262,6 +265,11 @@ int loop(void *arg)
                 fprintf(stderr, "EOF/error on target tty\n");
                 exit(1);
             }
+	    buf[cc] = 0;
+	    if (strstr(buf,"ING") == NULL)
+	    {
+	      ring(1, 1000.0);
+	    }
             safe_output(buf, cc);
         }
     }
@@ -272,8 +280,21 @@ bool run_at_backend(int modem_fd)
     thrd_t rx_thread;
     int result;
 
+    char cmd[MAX_BUF_SIZE];
+
+    sprintf(cmd, "ATZ\r");
+    int res = write(modem_fd, cmd, strlen(cmd));
+    fprintf(stderr, "aqui 3\n");
+    if (res < 0)
+    {
+        fprintf(stderr, "Error writing to the modem\n");
+        return false;
+    }
+
+    
     thrd_create(&rx_thread, loop, &modem_fd );
 
-    thrd_join(&rx_thread, &result);
+    thrd_join(rx_thread, &result);
 
+    return true;
 }

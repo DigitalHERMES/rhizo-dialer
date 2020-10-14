@@ -43,6 +43,6 @@ int open_serial_port(char *ttyport);
 
 void set_fixed_baudrate(char *baudname, int target_fd);
 
-bool run_at_backend(int modem_fd)
+bool run_at_backend(int modem_fd);
 
 #endif // HAVE_AT_H__

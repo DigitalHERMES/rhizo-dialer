@@ -23,7 +23,7 @@ bool ring (double seconds, double freq)
     rc = snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
     if(rc < 0){
         fprintf(stderr,
-                "unable to open defualt device: %s\n", snd_strerror(rc));
+                "unable to open default device: %s\n", snd_strerror(rc));
         return false;
     }
 

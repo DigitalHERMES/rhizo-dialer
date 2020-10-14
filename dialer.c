@@ -33,6 +33,7 @@
 #include "ui.h"
 #include "at.h" // at and modem helpers
 #include "audio_setup.h" // alsa audio routing
+#include "ring-audio.h"
 
 #define MODE_NONE 0
 #define MODE_DIAL_PAD 1
@@ -61,11 +62,12 @@ void sig_handler(int sig_num)
     }
     else
     {
-        printf("\n Caught the signal number [%d]\n", sig_num);
+      printf("\n Caught the signal number [%d]\n", sig_num);
     }
 
 }
 
+#if 0
 gint incoming_call_checker (gpointer data)
 {
     char cmd[MAX_BUF_SIZE];
@@ -77,7 +79,7 @@ gint incoming_call_checker (gpointer data)
 
     fprintf(stderr, "incoming call checker\n");
 
-#if 0
+    //#if 0
     res = fputs(cmd, modem);
     if (res < 0)
     {
@@ -85,7 +87,7 @@ gint incoming_call_checker (gpointer data)
         clearerr(modem);
         return true; // I shold be returning false here... may be.
     }
-#endif
+    //#endif
     
 
     if (get_response(response, modem))
@@ -94,7 +96,7 @@ gint incoming_call_checker (gpointer data)
         if (strstr(response, "RING") != NULL)
 	{
             fprintf(stderr, "Ringing!\n");
-#if 0
+	    //#if 0
             sprintf(cmd, "AT+CLCC\r");
             res = fputs(cmd, modem);
             if (res < 0)
@@ -108,7 +110,7 @@ gint incoming_call_checker (gpointer data)
                 fprintf(stderr, "%s\n", response);
                 // parse the number...
             }
-#endif
+	    //#endif
             // TODO send a AT+CLCC to see who is calling
             gtk_widget_show(GTK_WIDGET(window));
             hildon_entry_set_text((HildonEntry *)display, "!!!RINGING!!!");
@@ -126,6 +128,7 @@ gint incoming_call_checker (gpointer data)
     return true;
 
 }
+#endif
 
 gboolean hide_instead(GtkWidget * widget, char key_pressed)
 {
@@ -136,43 +139,39 @@ gboolean hide_instead(GtkWidget * widget, char key_pressed)
 void callback_button_pressed(GtkWidget * widget, char key_pressed)
 {
     char cmd[MAX_BUF_SIZE];
-    char response[MAX_BUF_SIZE];
     int res;
 
     fprintf(stderr, "Pressed %c\n", key_pressed);
 
     if (key_pressed == 'D' || key_pressed == 'H' || key_pressed == 'A')
     {
-        gtk_timeout_remove(timer);
-	usleep(400000);
+
     }
     
     if (key_pressed == 'D')
     {
-        snprintf(cmd, MAX_BUF_SIZE, "ATD%s;\r", dial_pad);
-        fprintf(stderr, "Dial cmd: %s\n", cmd);
-        res = fputs(cmd, modem);
-	if (res < 0)
-	{
-	    fprintf(stderr, "Error writing to the modem\n");
-	    clearerr(modem);
-	    return;
-	}
-	get_response(response, modem);
-        if (set_alsa)
-            call_audio_setup();
+      // SEND
+      snprintf(cmd, MAX_BUF_SIZE, "ATD%s;\r", dial_pad);
+      fprintf(stderr, "Dial cmd: %s\n", cmd);
+      res = write(modem_fd, cmd, strlen(cmd));
+      if (res < 0)
+      {
+	  fprintf(stderr, "Error writing to the modem\n");
+	  return;
+      }
+
+      if (set_alsa)
+	call_audio_setup();
     }
 
     if (key_pressed == 'H'){
         sprintf(cmd, "ATH\r");
-        res = fputs(cmd, modem);
+	res = write(modem_fd, cmd, strlen(cmd));
 	if (res < 0)
 	{
 	    fprintf(stderr, "Error writing to the modem\n");
-	    clearerr(modem);
 	    return;
 	}
-	get_response(response, modem);
         memset (dial_pad, 0, MAX_BUF_SIZE);
     }
 
@@ -180,21 +179,15 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     {
         sprintf(cmd, "ATA\r");
         fprintf(stderr, "Dial cmd: %s\n", cmd);
-        res = fputs(cmd, modem);
+	res = write(modem_fd, cmd, strlen(cmd));
 	if (res < 0)
 	{
 	    fprintf(stderr, "Error writing to the modem\n");
-	    clearerr(modem);
 	    return;
 	}
-	get_response(response, modem);
+
         if (set_alsa)
             call_audio_setup();
-    }
-
-    if (key_pressed == 'D' || key_pressed == 'H' || key_pressed == 'A')
-    {
-        g_timeout_add(1500, incoming_call_checker, NULL);
     }
 
     if ((key_pressed >= '0' && key_pressed <= '9') ||
@@ -427,8 +420,9 @@ int main(int argc, char *argv[])
         // make this a parameter?
         set_fixed_baudrate("115200", modem_fd);
 
+	fprintf(stderr, "running at\n");
         bool at_res = run_at_backend(modem_fd);
-        if (at_red == false)
+        if (at_res == false)
         {
             fprintf(stderr, "at error\n");
             return EXIT_FAILURE;
