@@ -266,9 +266,9 @@ int loop(void *arg)
                 exit(1);
             }
 	    buf[cc] = 0;
-	    if (strstr(buf,"ING") == NULL)
+	    if (strstr(buf,"ING") != NULL)
 	    {
-	      ring(1, 1000.0);
+	      ring(1, 1800.0);
 	    }
             safe_output(buf, cc);
         }
