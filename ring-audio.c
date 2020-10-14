@@ -9,7 +9,8 @@
 
 bool ring (double seconds, double freq)
 {
-    int sampling_rate = 48000, dir = 0, rc, i, j = 0;
+    unsigned int sampling_rate = 48000;
+    int dir = 0, rc, i, j = 0;
     char * buffer;
     double x, y;
     int sample, amp = 10000;
