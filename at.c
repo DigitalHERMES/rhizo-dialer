@@ -35,6 +35,16 @@
 
 #include "at.h"
 #include "ring-audio.h"
+#include "daemonize.h"
+
+#include <hildon/hildon-banner.h>
+#include <hildon/hildon-program.h>
+#include <hildon/hildon.h>
+#include <gtk/gtk.h>
+
+extern GtkWidget *window;
+extern char dial_pad[MAX_BUF_SIZE];
+extern GtkWidget *display;
 
 struct baudrate {
     char       *name;
@@ -140,6 +150,7 @@ int open_serial_port(char *ttyport)
         perror(ttyport);
         exit(EXIT_FAILURE);
     }
+
     ioctl(target_fd, TIOCEXCL);
     return target_fd;
 }
@@ -214,7 +225,7 @@ void safe_output(unsigned char *buf, int cc)
     for (i = 0; i < cc; i++) {
         c = buf[i];
         if (c == '\r' || c == '\n' || c == '\t' || c == '\b') {
-            putchar(c);
+	    putchar(c);
             continue;
         }
         if (c & 0x80) {
@@ -268,9 +279,16 @@ int loop(void *arg)
 	    buf[cc] = 0;
 	    if (strstr(buf,"ING") != NULL)
 	    {
-	      ring(1, 1800.0);
+	        log_message(LOG_FILE,"RINGING\n");
+		if (!gtk_widget_get_visible (GTK_WIDGET(window)))
+		{
+		    gtk_widget_show(GTK_WIDGET(window));
+		    // sprintf(dial_pad, "!! RINGING !!");
+		    hildon_entry_set_text((HildonEntry *)display, "!! RINGING !!");
+		}
+		ring(1, 1800.0);
 	    }
-            safe_output(buf, cc);
+            // safe_output(buf, cc);
         }
     }
 }
@@ -284,17 +302,16 @@ bool run_at_backend(int modem_fd)
 
     sprintf(cmd, "ATZ\r");
     int res = write(modem_fd, cmd, strlen(cmd));
-    fprintf(stderr, "aqui 3\n");
+
     if (res < 0)
     {
         fprintf(stderr, "Error writing to the modem\n");
         return false;
     }
 
-    
     thrd_create(&rx_thread, loop, &modem_fd );
 
-    thrd_join(rx_thread, &result);
+    //    thrd_join(rx_thread, &result);
 
     return true;
 }

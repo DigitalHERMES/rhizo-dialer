@@ -30,6 +30,7 @@
 
 #define BACKEND_NONE 0
 #define BACKEND_AT 1
+#define BACKEND_OFONO 2
 
 void strip_cr(char *s);
 

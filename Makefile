@@ -27,7 +27,7 @@ audio_setup.o: audio_setup.c audio_setup.h
 ring-audio.o:  ring-audio.c ring-audio.h
 	$(CC) $(CFLAGS) -c -o ring-audio.o ring-audio.c
 
-install:
+install: dialer
 	install -d /usr/bin
 	install dialer /usr/bin
 	install -d /usr/share/icons/

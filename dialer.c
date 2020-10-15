@@ -49,18 +49,18 @@ void sig_handler(int sig_num)
 
     if(sig_num == SIGINT)
       {
-        printf("\n Caught the SIGINT signal. Exiting...\n");
+	//        printf("\n Caught the SIGINT signal. Exiting...\n");
         close(modem_fd);
         exit(EXIT_SUCCESS);
     }
     else if (sig_num == SIGUSR1)
     {
-        printf("\n Caught the SIGUSR1 - showing dial pad\n");
+      // printf("\n Caught the SIGUSR1 - showing dial pad\n");
         gtk_widget_show(GTK_WIDGET(window));
     }
     else
     {
-      printf("\n Caught the signal number [%d]\n", sig_num);
+      // printf("\n Caught the signal number [%d]\n", sig_num);
     }
 
 }
@@ -139,13 +139,13 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     char cmd[MAX_BUF_SIZE];
     int res;
 
-    fprintf(stderr, "Pressed %c\n", key_pressed);
+    //    fprintf(stderr, "Pressed %c\n", key_pressed);
 
     if (key_pressed == 'D')
     {
       // SEND
       snprintf(cmd, MAX_BUF_SIZE, "ATD%s;\r", dial_pad);
-      fprintf(stderr, "Dial cmd: %s\n", cmd);
+      //      fprintf(stderr, "Dial cmd: %s\n", cmd);
       res = write(modem_fd, cmd, strlen(cmd));
       if (res < 0)
       {
@@ -260,7 +260,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "    -s                      Set alsa routing option (right now - no option yet!)\n");
         fprintf(stderr, "    -d                      Daemonize\n");
         fprintf(stderr, "    -m <modem AT device>    Modem AT device\n");
-        fprintf(stderr, "    -b <at, ofono>          Choose between AT and ofono backends (not working yet)");
+        fprintf(stderr, "    -b <at, ofono>          Choose between AT and ofono backends (not working yet)\n");
         return EXIT_SUCCESS;
     }
     int opt;
@@ -287,6 +287,10 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (daemonize_flag == true)
+        daemonize();
+
+    
     if (!gtk_init_check (&argc, &argv)) {
         fprintf(stderr, "Display cannot be initialized, wait for the curses interface :-P\n");
         exit (-1);
@@ -294,9 +298,6 @@ int main(int argc, char *argv[])
 
     signal(SIGINT, sig_handler);
     signal(SIGUSR1, sig_handler);
-
-    if (daemonize_flag == true)
-        daemonize();
 
     /* Create the hildon program and setup the title */
     program = HILDON_PROGRAM(hildon_program_get_instance());
@@ -401,56 +402,30 @@ int main(int argc, char *argv[])
     //    g_signal_connect(G_OBJECT(window), "delete_event", G_CALLBACK(gtk_main_quit), NULL);
     g_signal_connect(G_OBJECT(window), "delete-event", G_CALLBACK(hide_instead), NULL);
 
-
     if (backend == BACKEND_AT)
     {
+        log_message(LOG_FILE,"Starting AT backend\n");
         // Modem initialization
         modem_fd = open_serial_port(modem_path);
 
         if (modem_fd == -1)
         {
-            fprintf(stderr, "Could not open modem\n");
+	    log_message(LOG_FILE, "Could not open modem\n");
             return EXIT_FAILURE;
         }
 
         // make this a parameter?
         set_fixed_baudrate("115200", modem_fd);
 
-	fprintf(stderr, "running at\n");
         bool at_res = run_at_backend(modem_fd);
         if (at_res == false)
         {
-            fprintf(stderr, "at error\n");
+	    log_message(LOG_FILE, "AT Error\n");
             return EXIT_FAILURE;
         }
     }
 
-
-#if 0
-    // remove-me!
-    modem = fdopen(modem_fd, "r+");
-
-    char cmd[MAX_BUF_SIZE];
-    char response[MAX_BUF_SIZE];
-
-    fprintf(stderr, "aqui 2\n");
-
-    sprintf(cmd, "ATZ\r");
-    int res = fputs(cmd, modem);
-    fprintf(stderr, "aqui 3\n");
-    if (res < 0)
-    {
-        fprintf(stderr, "Error writing to the modem\n");
-        return EXIT_FAILURE;
-    }
-
-    if (get_response(response, modem))
-        fprintf(stderr, "%s\n", response);
-    else
-        fprintf(stderr, "Problems with AT chat\n");
-    fprintf(stderr, "aqui 4\n");
-
-#endif
+    log_message(LOG_FILE,"aqui 4444\n");
 
     /* Begin the main application */
     gtk_widget_show_all(GTK_WIDGET(window));

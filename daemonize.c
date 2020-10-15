@@ -38,6 +38,7 @@ void log_message(char *filename,char *message){
     if(!logfile)
         return;
     fprintf(logfile,"%s",message);
+    fflush(logfile);
     fclose(logfile);
 }
 
@@ -65,7 +66,10 @@ void daemonize(){
         exit(1);
     if(i > 0)
         exit(0);
-    setsid();
+
+
+    if (setsid() < 0)
+      exit(EXIT_FAILURE);
 
     for(i = getdtablesize(); i >= 0; --i)
         close(i);
@@ -73,19 +77,32 @@ void daemonize(){
     i = open("/dev/null",O_RDWR);
     dup(i);
     dup(i);
+    dup(i);
     umask(027);
 
     chdir(RUNNING_DIR);
 
-    /* Fork off for the second time*/
-    pid_t pid = fork();
+    signal(SIGCHLD,SIG_IGN);
+    signal(SIGTSTP,SIG_IGN);
+    signal(SIGTTOU,SIG_IGN);
+    signal(SIGTTIN,SIG_IGN);
 
+    signal(SIGHUP,signal_handler);
+    signal(SIGTERM,signal_handler);
+    
+    /* Fork off for the second time*/
+    i = fork();
+
+    char buff[512];
+    sprintf(buff, "i = %d\n", i);
+    log_message(LOG_FILE, buff);    
+    
     /* An error occurred */
-    if (pid < 0)
+    if (i < 0)
         exit(EXIT_FAILURE);
 
     /* Success: Let the parent terminate */
-    if (pid > 0)
+    if (i > 0)
         exit(EXIT_SUCCESS);
 
     lfp = open(LOCK_FILE,O_RDWR|O_CREAT,0640);
@@ -97,11 +114,6 @@ void daemonize(){
     sprintf(str,"%d\n",getpid());
     write(lfp,str,strlen(str));
 
-    signal(SIGCHLD,SIG_IGN);
-    signal(SIGTSTP,SIG_IGN);
-    signal(SIGTTOU,SIG_IGN);
-    signal(SIGTTIN,SIG_IGN);
 
-    signal(SIGHUP,signal_handler);
-    signal(SIGTERM,signal_handler);
+    
 }
