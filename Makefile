@@ -6,8 +6,8 @@ LDFLAGS=`pkg-config --libs $(LIBRARIES)` -lm -pthread -lasound
 
 all: dialer
 
-dialer: dialer.o at.o audio_setup.o ring-audio.o
-	$(CC) $(LDFLAGS) dialer.o at.o audio_setup.o ring-audio.o -o dialer
+dialer: dialer.o at.o audio_setup.o ring-audio.o daemonize.o
+	$(CC) $(LDFLAGS) dialer.o at.o audio_setup.o ring-audio.o daemonize.o -o dialer
 
 dialer.o: dialer.c ui.h
 	$(CC) $(CFLAGS) -c -o dialer.o dialer.c
@@ -17,6 +17,9 @@ tp.o: tp.c tp.h
 
 at.o: at.c at.h
 	$(CC) $(CFLAGS) -c -o at.o at.c
+
+daemonize.o: daemonize.c daemonize.h
+	$(CC) $(CFLAGS) -c -o daemonize.o daemonize.c
 
 audio_setup.o: audio_setup.c audio_setup.h
 	$(CC) $(CFLAGS) -c -o audio_setup.o audio_setup.c
@@ -33,4 +36,4 @@ install:
 	install dialer.desktop /usr/share/applications/hildon/
 
 clean:
-	rm -f dialer.o at.o tp.o audio_setup.o ring_audio.o dialer
+	rm -f dialer.o at.o tp.o audio_setup.o ring_audio.o daemonize.o dialer

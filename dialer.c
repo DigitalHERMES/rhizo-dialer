@@ -34,6 +34,7 @@
 #include "at.h" // at and modem helpers
 #include "audio_setup.h" // alsa audio routing
 #include "ring-audio.h"
+#include "daemonize.h"
 
 #define MODE_NONE 0
 #define MODE_DIAL_PAD 1
@@ -45,14 +46,11 @@ bool set_alsa;
 
 void sig_handler(int sig_num)
 {
-  //    char response[MAX_BUF_SIZE];
 
     if(sig_num == SIGINT)
       {
         printf("\n Caught the SIGINT signal. Exiting...\n");
-        sleep(2);
-	//        get_response(response, modem);
-	close(modem_fd);
+        close(modem_fd);
         exit(EXIT_SUCCESS);
     }
     else if (sig_num == SIGUSR1)
@@ -74,7 +72,7 @@ gint incoming_call_checker (gpointer data)
     int res;
     char response[MAX_BUF_SIZE];
     static int tiktoc = false;
-    
+
     sprintf(cmd, "AT+CPAS\r");
 
     fprintf(stderr, "incoming call checker\n");
@@ -143,11 +141,6 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 
     fprintf(stderr, "Pressed %c\n", key_pressed);
 
-    if (key_pressed == 'D' || key_pressed == 'H' || key_pressed == 'A')
-    {
-
-    }
-    
     if (key_pressed == 'D')
     {
       // SEND
@@ -156,22 +149,22 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
       res = write(modem_fd, cmd, strlen(cmd));
       if (res < 0)
       {
-	  fprintf(stderr, "Error writing to the modem\n");
-	  return;
+          fprintf(stderr, "Error writing to the modem\n");
+          return;
       }
 
       if (set_alsa)
-	call_audio_setup();
+          call_audio_setup();
     }
 
     if (key_pressed == 'H'){
         sprintf(cmd, "ATH\r");
-	res = write(modem_fd, cmd, strlen(cmd));
-	if (res < 0)
-	{
-	    fprintf(stderr, "Error writing to the modem\n");
-	    return;
-	}
+        res = write(modem_fd, cmd, strlen(cmd));
+        if (res < 0)
+        {
+            fprintf(stderr, "Error writing to the modem\n");
+            return;
+        }
         memset (dial_pad, 0, MAX_BUF_SIZE);
     }
 
@@ -179,12 +172,12 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     {
         sprintf(cmd, "ATA\r");
         fprintf(stderr, "Dial cmd: %s\n", cmd);
-	res = write(modem_fd, cmd, strlen(cmd));
-	if (res < 0)
-	{
-	    fprintf(stderr, "Error writing to the modem\n");
-	    return;
-	}
+        res = write(modem_fd, cmd, strlen(cmd));
+        if (res < 0)
+        {
+            fprintf(stderr, "Error writing to the modem\n");
+            return;
+        }
 
         if (set_alsa)
             call_audio_setup();
@@ -301,6 +294,9 @@ int main(int argc, char *argv[])
 
     signal(SIGINT, sig_handler);
     signal(SIGUSR1, sig_handler);
+
+    if (daemonize == true)
+        daemonize();
 
     /* Create the hildon program and setup the title */
     program = HILDON_PROGRAM(hildon_program_get_instance());
