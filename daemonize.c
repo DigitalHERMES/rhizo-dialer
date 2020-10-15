@@ -25,6 +25,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
 
 #include "daemonize.h"
 
@@ -75,7 +78,7 @@ void daemonize(){
     chdir(RUNNING_DIR);
 
     /* Fork off for the second time*/
-    pid = fork();
+    pid_t pid = fork();
 
     /* An error occurred */
     if (pid < 0)

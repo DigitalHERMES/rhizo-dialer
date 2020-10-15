@@ -246,7 +246,7 @@ int main(int argc, char *argv[])
 {
     char modem_path[MAX_MODEM_PATH];
     int mode = MODE_NONE;
-    bool daemonize = false;
+    bool daemonize_flag = false;
     set_alsa = false;
     int backend = BACKEND_AT;
 
@@ -279,7 +279,7 @@ int main(int argc, char *argv[])
             set_alsa = true;
             break;
         case 'd':
-            daemonize = true;
+            daemonize_flag = true;
             break;
         default:
             fprintf(stderr, "Wrong command line.\n");
@@ -295,7 +295,7 @@ int main(int argc, char *argv[])
     signal(SIGINT, sig_handler);
     signal(SIGUSR1, sig_handler);
 
-    if (daemonize == true)
+    if (daemonize_flag == true)
         daemonize();
 
     /* Create the hildon program and setup the title */
