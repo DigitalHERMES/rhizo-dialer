@@ -28,6 +28,7 @@
 #define LOG_FILE "dialer.log"
 
 void daemonize();
-void log_message(char *filename,char *message);
+void log_message(char *filename, char *message);
+char *get_time();
 
 #endif // HAVE_DAEMONIZE_H__

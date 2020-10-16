@@ -54,31 +54,6 @@ struct baudrate {
     int         xram_records;
 };
 
-#if 0
-bool get_response(char *response, FILE *modem)
-{
-    char buf[MAX_BUF_SIZE] = {};
-    char buf2[MAX_BUF_SIZE] = {};
-    char *line;
-
-
-    do {
-      line = fgets(buf, (int)sizeof(buf), modem);
-        if (line == NULL) {
-            fprintf(stderr, "EOF from modem\n");
-            // clearerr(modem);
-            return false;
-        }
-        strcat(buf2, line);
-
-    } while ( !is_final_result(line));
-
-    strip_cr(buf2);
-    strcpy(response, buf2);
-    return true;
-}
-#endif
-
 void strip_cr(char *s)
 {
     char *from, *to;
@@ -147,7 +122,8 @@ int open_serial_port(char *ttyport)
     int target_fd = open(ttyport, O_RDWR|O_NONBLOCK);
     if (target_fd < 0)
     {
-        perror(ttyport);
+        log_message(LOG_FILE, "open() serial port error\n");
+        // perror(ttyport);
         exit(EXIT_FAILURE);
     }
 
@@ -181,7 +157,8 @@ struct baudrate *find_baudrate_by_name(char *srch_name)
         return(br);
     else
     {
-        fprintf(stderr, "error: baud rate \"%s\" not known\n", srch_name);
+        log_message(LOG_FILE, "error: baud rate not known\n");
+//        fprintf(stderr, "error: baud rate \"%s\" not known\n", srch_name);
         return(NULL);
     }
 }
@@ -199,7 +176,8 @@ struct baudrate *set_serial_baudrate(struct baudrate *br, int target_fd)
     target_termios.c_ispeed = br->nonstd_speed;
     target_termios.c_ospeed = br->nonstd_speed;
     if (ioctl(target_fd, TCSETSF2, &target_termios) < 0) {
-        perror("TCSETSF2");
+        log_message(LOG_FILE, "ioctl() TCSETSF2 error\n");
+        // perror("TCSETSF2");
         exit(1);
     }
 
@@ -212,12 +190,10 @@ void set_fixed_baudrate(char *baudname, int target_fd)
 
     br = find_baudrate_by_name(baudname);
     if (!br)
-        exit(1);	/* error msg already printed */
+        exit(1); /* error msg already printed */
     set_serial_baudrate(br, target_fd);
 }
 
-// modernize-me!
-#if 1
 void safe_output(unsigned char *buf, int cc)
 {
     int i, c;
@@ -225,34 +201,30 @@ void safe_output(unsigned char *buf, int cc)
     for (i = 0; i < cc; i++) {
         c = buf[i];
         if (c == '\r' || c == '\n' || c == '\t' || c == '\b') {
-	    putchar(c);
             continue;
         }
         if (c & 0x80) {
-            putchar('M');
-            putchar('-');
             c &= 0x7F;
         }
         if (c < 0x20) {
-            putchar('^');
-            putchar(c + '@');
+            buf[i] = '^';
         } else if (c == 0x7F) {
-            putchar('^');
-            putchar('?');
-        } else
-            putchar(c);
+            buf[i] = '?';
+        }
     }
-    fflush(stdout);
 }
-#endif
 
 int loop(void *arg)
 {
-  int *target_fd_ptr = (int *)arg;
-  int target_fd = *target_fd_ptr;
-  char buf[MAX_BUF_SIZE];
-  fd_set fds, fds1;
-  int i, cc, max;
+    int *target_fd_ptr = (int *)arg;
+    int target_fd = *target_fd_ptr;
+    char buf[MAX_BUF_SIZE];
+    fd_set fds, fds1;
+    int i, cc, max;
+
+    if (thrd_detach(thrd_current()) != thrd_success) {
+        /* Handle error */
+    }
 
     FD_ZERO(&fds);
     FD_SET(target_fd, &fds);
@@ -263,32 +235,33 @@ int loop(void *arg)
         if (i < 0) {
             if (errno == EINTR)
                 continue;
-            perror("select");
+            log_message(LOG_FILE, "select() error\n");
+            // perror("select");
             exit(1);
         }
-        if ( true/* we have AT commands to write..*/ ) {
-            // sprintf(buf, "");
-            //  write(target_fd, buf, strlen(buf));
-        }
+
         if (FD_ISSET(target_fd, &fds1)) {
             cc = read(target_fd, buf, sizeof buf);
             if (cc <= 0) {
                 fprintf(stderr, "EOF/error on target tty\n");
                 exit(1);
             }
-	    buf[cc] = 0;
-	    if (strstr(buf,"ING") != NULL)
-	    {
-	        log_message(LOG_FILE,"RINGING\n");
-		if (!gtk_widget_get_visible (GTK_WIDGET(window)))
-		{
-		    gtk_widget_show(GTK_WIDGET(window));
-		    // sprintf(dial_pad, "!! RINGING !!");
-		    hildon_entry_set_text((HildonEntry *)display, "!! RINGING !!");
-		}
-		ring(1, 1800.0);
-	    }
-            // safe_output(buf, cc);
+            buf[cc] = 0;
+            if (strstr(buf,"ING") != NULL)
+            {
+                char ring_str[512];
+                sprintf(ring_str, "%s: RINGING\n", get_time());
+                log_message(LOG_FILE,ring_str);
+                if (!gtk_widget_get_visible (GTK_WIDGET(window)))
+                {
+                    gtk_widget_show(GTK_WIDGET(window));
+                    // sprintf(dial_pad, "!! RINGING !!");
+                }
+                hildon_entry_set_text((HildonEntry *)display, "!! RINGING !!");
+                ring(1, 1800.0);
+            }
+            safe_output(buf, cc);
+            log_message(LOG_FILE, buf);
         }
     }
 }
@@ -305,13 +278,11 @@ bool run_at_backend(int modem_fd)
 
     if (res < 0)
     {
-        fprintf(stderr, "Error writing to the modem\n");
+        log_message(LOG_FILE, "Error writing to the modem\n");
         return false;
     }
 
     thrd_create(&rx_thread, loop, &modem_fd );
-
-    //    thrd_join(rx_thread, &result);
 
     return true;
 }

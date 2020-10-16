@@ -31,8 +31,8 @@
 #include <threads.h>
 
 #include "ui.h"
-#include "at.h" // at and modem helpers
-#include "audio_setup.h" // alsa audio routing
+#include "at.h"
+#include "audio_setup.h"
 #include "ring-audio.h"
 #include "daemonize.h"
 
@@ -41,92 +41,22 @@
 
 int modem_fd;
 
-guint timer;
 bool set_alsa;
 
 void sig_handler(int sig_num)
 {
 
     if(sig_num == SIGINT)
-      {
-	//        printf("\n Caught the SIGINT signal. Exiting...\n");
+    {
         close(modem_fd);
         exit(EXIT_SUCCESS);
     }
     else if (sig_num == SIGUSR1)
     {
-      // printf("\n Caught the SIGUSR1 - showing dial pad\n");
         gtk_widget_show(GTK_WIDGET(window));
     }
-    else
-    {
-      // printf("\n Caught the signal number [%d]\n", sig_num);
-    }
 
 }
-
-#if 0
-gint incoming_call_checker (gpointer data)
-{
-    char cmd[MAX_BUF_SIZE];
-    int res;
-    char response[MAX_BUF_SIZE];
-    static int tiktoc = false;
-
-    sprintf(cmd, "AT+CPAS\r");
-
-    fprintf(stderr, "incoming call checker\n");
-
-    //#if 0
-    res = fputs(cmd, modem);
-    if (res < 0)
-    {
-        fprintf(stderr, "Error writing to the modem\n");
-        clearerr(modem);
-        return true; // I shold be returning false here... may be.
-    }
-    //#endif
-    
-
-    if (get_response(response, modem))
-      {
-        fprintf(stderr, "%s\n", response);
-        if (strstr(response, "RING") != NULL)
-	{
-            fprintf(stderr, "Ringing!\n");
-	    //#if 0
-            sprintf(cmd, "AT+CLCC\r");
-            res = fputs(cmd, modem);
-            if (res < 0)
-            {
-                fprintf(stderr, "Error writing to the modem\n");
-                clearerr(modem);
-                return true; // I shold be returning false here... may be.
-            }
-            if (get_response(response, modem))
-            {
-                fprintf(stderr, "%s\n", response);
-                // parse the number...
-            }
-	    //#endif
-            // TODO send a AT+CLCC to see who is calling
-            gtk_widget_show(GTK_WIDGET(window));
-            hildon_entry_set_text((HildonEntry *)display, "!!!RINGING!!!");
-            /* Show the dialog */
-            //gtk_widget_show_all(GTK_WIDGET(dialog));
-            /* Wait for user to select OK or CANCEL */
-            //result = gtk_dialog_run(GTK_DIALOG(dialog));
-            /* Close the dialog */
-            // gtk_widget_destroy(GTK_WIDGET(dialog));
-
-        }
-        fprintf(stderr, "%s\n", response);
-    }
-
-    return true;
-
-}
-#endif
 
 gboolean hide_instead(GtkWidget * widget, char key_pressed)
 {
@@ -139,22 +69,21 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     char cmd[MAX_BUF_SIZE];
     int res;
 
-    //    fprintf(stderr, "Pressed %c\n", key_pressed);
-
     if (key_pressed == 'D')
     {
-      // SEND
       snprintf(cmd, MAX_BUF_SIZE, "ATD%s;\r", dial_pad);
-      //      fprintf(stderr, "Dial cmd: %s\n", cmd);
       res = write(modem_fd, cmd, strlen(cmd));
       if (res < 0)
       {
-          fprintf(stderr, "Error writing to the modem\n");
+          log_message(LOG_FILE,"Error writing to the modem\n");
           return;
       }
 
       if (set_alsa)
+      {
+          // save status first ?
           call_audio_setup();
+      }
     }
 
     if (key_pressed == 'H'){
@@ -162,7 +91,7 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
         res = write(modem_fd, cmd, strlen(cmd));
         if (res < 0)
         {
-            fprintf(stderr, "Error writing to the modem\n");
+            log_message(LOG_FILE,"Error writing to the modem\n");
             return;
         }
         memset (dial_pad, 0, MAX_BUF_SIZE);
@@ -171,15 +100,14 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
     if (key_pressed == 'A')
     {
         sprintf(cmd, "ATA\r");
-        fprintf(stderr, "Dial cmd: %s\n", cmd);
         res = write(modem_fd, cmd, strlen(cmd));
         if (res < 0)
         {
-            fprintf(stderr, "Error writing to the modem\n");
+            log_message(LOG_FILE,"Error writing to the modem\n");
             return;
         }
 
-        if (set_alsa)
+        if (set_alsa) // save status first?
             call_audio_setup();
     }
 
@@ -218,10 +146,10 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 // /usr/share/ofono/scripts/enable-modem /usr/share/ofono/scripts/online-modem
 
 // Querying IMEI:
-//AT+CGSN
+// AT+CGSN
 
 // Query IMSI
-//AT+CIMI
+// AT+CIMI
 
 // Signal quality
 // AT+CSQ
@@ -232,14 +160,12 @@ void callback_button_pressed(GtkWidget * widget, char key_pressed)
 // Query operator
 // AT+COPS?
 
-// Query call state
+// Query call state (to check who is calling:)
 // AT+CLCC
 
 // with this I can see if someone is calling, and drop an ATA...
 // Query ME state
 // AT+CPAS
-
-    // Send ATZ and set it to ring (see setup-modem.sh from maemo)
 
 
 int main(int argc, char *argv[])
@@ -253,18 +179,18 @@ int main(int argc, char *argv[])
     if (argc < 2){
     usage_info:
         fprintf(stderr, "Usage: %s [-h] [-p] [-s] [-d] -m modem_dev\n", argv[0]);
-        fprintf(stderr, "Usage example: %s -d 99991234\n\n", argv[0]);
+        fprintf(stderr, "Usage example: %s -m /dev/EG25.AT -s -d\n\n", argv[0]);
         fprintf(stderr, "OPTIONS:\n");
         fprintf(stderr, "    -h                      Show this help\n");
         fprintf(stderr, "    -p                      Open Dial Pad\n");
         fprintf(stderr, "    -s                      Set alsa routing option (right now - no option yet!)\n");
         fprintf(stderr, "    -d                      Daemonize\n");
         fprintf(stderr, "    -m <modem AT device>    Modem AT device\n");
-        fprintf(stderr, "    -b <at, ofono>          Choose between AT and ofono backends (not working yet)\n");
+        fprintf(stderr, "    -b <at, ofono>          Choose between AT and ofono backends (ofono not implemented yet!)\n");
         return EXIT_SUCCESS;
     }
     int opt;
-    while ((opt = getopt(argc, argv, "hpm:sd")) != -1){
+    while ((opt = getopt(argc, argv, "hpm:sdb:")) != -1){
         switch (opt){
         case 'h':
             goto usage_info;
@@ -274,6 +200,9 @@ int main(int argc, char *argv[])
             break;
         case 'm':
             strncpy (modem_path, optarg, MAX_MODEM_PATH);
+            break;
+        case 'b':
+            // TODO: set backend
             break;
         case 's':
             set_alsa = true;
@@ -290,10 +219,10 @@ int main(int argc, char *argv[])
     if (daemonize_flag == true)
         daemonize();
 
-    
+
     if (!gtk_init_check (&argc, &argv)) {
-        fprintf(stderr, "Display cannot be initialized, wait for the curses interface :-P\n");
-        exit (-1);
+        log_message(LOG_FILE,"Display cannot be initialized, wait for the curses interface :-P\n");
+        exit (EXIT_FAILURE);
     }
 
     signal(SIGINT, sig_handler);
@@ -301,7 +230,7 @@ int main(int argc, char *argv[])
 
     /* Create the hildon program and setup the title */
     program = HILDON_PROGRAM(hildon_program_get_instance());
-    g_set_application_name("Rhizomatica Dialer");
+    g_set_application_name("Rhizomatica's Dialer");
 
     /* Create HildonWindow and set it to HildonProgram */
     window = HILDON_WINDOW(hildon_window_new());
@@ -410,7 +339,7 @@ int main(int argc, char *argv[])
 
         if (modem_fd == -1)
         {
-	    log_message(LOG_FILE, "Could not open modem\n");
+            log_message(LOG_FILE, "Could not open modem\n");
             return EXIT_FAILURE;
         }
 
@@ -420,7 +349,7 @@ int main(int argc, char *argv[])
         bool at_res = run_at_backend(modem_fd);
         if (at_res == false)
         {
-	    log_message(LOG_FILE, "AT Error\n");
+            log_message(LOG_FILE, "AT Error\n");
             return EXIT_FAILURE;
         }
     }

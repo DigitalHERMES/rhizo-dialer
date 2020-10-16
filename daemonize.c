@@ -27,17 +27,26 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
+#include <time.h>
 
 #include "daemonize.h"
 
+char *get_time()
+{
+    time_t rawtime;
+    struct tm *timeinfo;
 
-void log_message(char *filename,char *message){
+    time (&rawtime);
+    timeinfo = localtime (&rawtime);
+    return (asctime (timeinfo));
+}
+
+void log_message(char *filename, char *message){
     FILE *logfile;
     logfile = fopen(filename,"a");
     if(!logfile)
         return;
-    fprintf(logfile,"%s",message);
+    fprintf(logfile,"%s", message);
     fflush(logfile);
     fclose(logfile);
 }

@@ -12,9 +12,6 @@ dialer: dialer.o at.o audio_setup.o ring-audio.o daemonize.o
 dialer.o: dialer.c ui.h
 	$(CC) $(CFLAGS) -c -o dialer.o dialer.c
 
-tp.o: tp.c tp.h
-	$(CC) $(CFLAGS) -c -o tp.o tp.c
-
 at.o: at.c at.h
 	$(CC) $(CFLAGS) -c -o at.o at.c
 
@@ -36,4 +33,4 @@ install: dialer
 	install dialer.desktop /usr/share/applications/hildon/
 
 clean:
-	rm -f dialer.o at.o tp.o audio_setup.o ring_audio.o daemonize.o dialer
+	rm -f dialer.o at.o audio_setup.o ring_audio.o daemonize.o dialer
